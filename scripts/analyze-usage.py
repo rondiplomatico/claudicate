@@ -73,6 +73,8 @@ def main():
     parser.add_argument("--project-filter", help="Only include entries matching this project directory")
     parser.add_argument("--format", choices=["text", "markdown"], default="text", help="Output format")
     parser.add_argument("--output", help="Write report to file instead of stdout")
+    parser.add_argument("--include-agents", action="store_true",
+                        help="Include agent sessions (excluded by default)")
     args = parser.parse_args()
 
     since_date = None
@@ -98,6 +100,16 @@ def main():
         records = [r for r in records
                    if os.path.realpath(r.get('project_dir', '')) == filter_path]
 
+    # Filter agent sessions unless --include-agents
+    if not args.include_agents:
+        total_before = len(records)
+        records = [r for r in records
+                   if not (r.get('session_id', '').startswith('agent-')
+                           or 'agent' in r.get('tags', []))]
+        agent_excluded = total_before - len(records)
+    else:
+        agent_excluded = 0
+
     if not records:
         print("No log entries found in:", ", ".join(log_dirs))
         if since_date:
@@ -114,6 +126,9 @@ def main():
     asks = [r for r in records if r.get('event_type') == 'ask_response']
     denials = [r for r in records if r.get('event_type') == 'tool_denial']
     turn_ends = [r for r in records if r.get('event_type') == 'turn_end']
+
+    if agent_excluded > 0:
+        p(f"*Agent sessions excluded: {agent_excluded} entries (use --include-agents to include)*\n")
 
     # ============ VOLUME ============
     p(section("VOLUME", fmt))

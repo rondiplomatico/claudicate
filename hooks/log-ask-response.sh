@@ -36,6 +36,11 @@ ANSWER=$(echo "$INPUT" | jq -r '.tool_response // empty')
 
 TAGS='["clarification"]'
 
+# Agent session detection (session_id format: agent-XXXXXXX)
+if [[ "$SESSION_ID" == agent-* ]]; then
+  TAGS=$(echo "$TAGS" | jq '. + ["agent"]')
+fi
+
 jq -n -c \
   --arg ts "$TIMESTAMP" \
   --arg et "ask_response" \

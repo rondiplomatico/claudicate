@@ -64,6 +64,13 @@ TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 TOKEN_USAGE=$(extract_token_usage "$TRANSCRIPT_PATH")
 
+# Agent session detection (session_id format: agent-XXXXXXX)
+if [[ "$SESSION_ID" == agent-* ]]; then
+  TAGS='["agent"]'
+else
+  TAGS='[]'
+fi
+
 # Build the JSON entry, conditionally including token_usage
 if [ "$TOKEN_USAGE" = "null" ]; then
   jq -n -c \
@@ -73,7 +80,7 @@ if [ "$TOKEN_USAGE" = "null" ]; then
     --arg pd "$PROJECT_DIR" \
     --arg cwd "$CWD" \
     --arg model "$MODEL" \
-    --argjson tags '[]' \
+    --argjson tags "$TAGS" \
     '{timestamp: $ts, event_type: $et, session_id: $sid, project_dir: $pd, cwd: $cwd, model: $model, tags: $tags}' \
     >> "$LOG_FILE"
 else
@@ -85,7 +92,7 @@ else
     --arg cwd "$CWD" \
     --arg model "$MODEL" \
     --argjson usage "$TOKEN_USAGE" \
-    --argjson tags '[]' \
+    --argjson tags "$TAGS" \
     '{timestamp: $ts, event_type: $et, session_id: $sid, project_dir: $pd, cwd: $cwd, model: $model, token_usage: $usage, tags: $tags}' \
     >> "$LOG_FILE"
 fi

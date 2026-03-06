@@ -67,6 +67,11 @@ TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 TAGS=$(auto_tag "$PROMPT")
 
+# Agent session detection (session_id format: agent-XXXXXXX)
+if [[ "$SESSION_ID" == agent-* ]]; then
+  TAGS=$(echo "$TAGS" | jq '. + ["agent"]')
+fi
+
 jq -n -c \
   --arg ts "$TIMESTAMP" \
   --arg et "prompt" \

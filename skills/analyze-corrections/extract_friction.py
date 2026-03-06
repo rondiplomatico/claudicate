@@ -215,6 +215,8 @@ def main():
     parser.add_argument("--project-filter", help="Only include entries matching this project directory")
     parser.add_argument("--output", default="/tmp/promptforge-friction-data.json",
                         help="Output JSON file")
+    parser.add_argument("--include-agents", action="store_true",
+                        help="Include agent sessions (excluded by default)")
     args = parser.parse_args()
 
     # Load logs from all sources
@@ -226,6 +228,16 @@ def main():
         filter_path = os.path.realpath(args.project_filter)
         entries = [e for e in entries
                    if os.path.realpath(e.get('project_dir', '')) == filter_path]
+
+    # Filter agent sessions unless --include-agents
+    if not args.include_agents:
+        total_before = len(entries)
+        entries = [e for e in entries
+                   if not (e.get('session_id', '').startswith('agent-')
+                           or 'agent' in e.get('tags', []))]
+        agent_excluded = total_before - len(entries)
+        if agent_excluded:
+            print(f"Excluded {agent_excluded} agent entries")
 
     if not entries:
         print("No log entries found.", file=sys.stderr)

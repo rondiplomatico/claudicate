@@ -51,7 +51,7 @@ jq -n -c \
   --argjson input "$TOOL_INPUT" \
   --arg reason "$DENIAL_REASON" \
   --argjson interrupt "$IS_INTERRUPT" \
-  --argjson tags '["correction"]' \
+  --argjson tags "$(if [[ "$SESSION_ID" == agent-* ]]; then echo '["correction","agent"]'; else echo '["correction"]'; fi)" \
   '{timestamp: $ts, event_type: $et, session_id: $sid, project_dir: $pd, cwd: $cwd, denied_tool: $tool, denied_input: $input, denial_reason: $reason, is_interrupt: $interrupt, tags: $tags}' \
   >> "$LOG_FILE"
 

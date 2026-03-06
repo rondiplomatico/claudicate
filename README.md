@@ -2,6 +2,8 @@
 
 A self-improvement toolkit for Claude Code. Captures user interactions (prompts, clarification answers, tool denials, turn metadata) as structured JSONL, then analyzes friction patterns and suggests improvements to your project configuration and BMAD setup.
 
+Agent sessions (from Claude Code sub-agents) are automatically detected and tagged. Analysis scripts exclude agent noise by default (`--include-agents` to opt in), and dedicated agent analysis tools let you inspect and improve agent behavior separately.
+
 ## Install / Uninstall
 
 **Prerequisites**: `jq` (required), `python3` (optional, for analysis scripts)
@@ -44,7 +46,7 @@ python3 scripts/analyze-usage.py --project-filter /path/to/project --format mark
 
 Detects friction patterns: repeated clarifications, tool denials, negation language, contradictions, and correction chains. Writes a Friction Report to the scope-appropriate location (project: `<project>/.claude/promptforge/friction-report.md`, global: `~/.claude/promptforge/friction-report.md`).
 
-Uses `skills/analyze-corrections/extract_friction.py` to pre-aggregate signals, reducing context load for analysis.
+Uses `skills/analyze-corrections/extract_friction.py` to pre-aggregate signals, reducing context load for analysis. Agent sessions are excluded by default.
 
 ### `/promptforge:improve-project` — Project Config Improvements
 
@@ -58,12 +60,33 @@ Filters friction patterns for BMAD-related items and cross-references with your 
 
 **Requires**: Run `analyze-corrections` first. Only useful if you use BMAD.
 
+### `/promptforge:analyze-agents` — Agent Session Analysis
+
+Analyzes Claude Code sub-agent sessions separately from user sessions. Reports agent-to-user ratio, prompt characteristics (including warmup noise), agent-specific friction, parent-child session correlation (which user prompts spawned which agents), and session complexity.
+
+```bash
+python3 scripts/analyze-agents.py --format markdown
+python3 scripts/analyze-agents.py --since 2026-02-01 --project-filter /path/to/project
+```
+
+### `/promptforge:improve-agents` — Agent Improvement Suggestions
+
+Uses agent analysis and friction data to suggest improvements to agent prompts, skill definitions, and CLAUDE.md agent instructions. Correlates agent friction back to the parent user intent that triggered it.
+
+**Requires**: Run `analyze-corrections` first. Works best after `analyze-agents` too.
+
 ### Recommended Workflow
 
+**User-focused improvement:**
 1. Use Claude Code normally to accumulate logs
 2. `/promptforge:analyze-usage` — understand your patterns
 3. `/promptforge:analyze-corrections` — generate friction report
 4. `/promptforge:improve-project` and/or `/promptforge:improve-bmad` — get actionable suggestions
+
+**Agent-focused improvement:**
+1. `/promptforge:analyze-agents` — understand agent usage patterns
+2. `/promptforge:analyze-corrections` — generate friction report (agents excluded by default)
+3. `/promptforge:improve-agents` — get suggestions for agent prompt and skill improvements
 
 ### Utility Scripts
 
