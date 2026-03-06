@@ -79,19 +79,20 @@ Uses agent analysis and friction data to suggest improvements to agent prompts, 
 
 ### `/promptforge improve-permissions` — Permission Optimization
 
-Analyzes your `settings.json` permission patterns and suggests optimizations:
+Analyzes permission patterns across both `settings.json` (shared/versioned) and `settings.local.json` (personal/local) and suggests optimizations:
 
-- **Redundancies**: entries already covered by broader patterns (e.g., `Bash(grep -h:*)` when `Bash(grep:*)` exists)
+- **Redundancies**: entries already covered by broader patterns (e.g., `Bash(grep -h:*)` when `Bash(grep:*)` exists) — including cross-file redundancies (local entry covered by shared pattern)
 - **Anomalies**: malformed entries (bash comments, broken syntax)
 - **Consolidation**: groups of one-off exact commands that can be replaced by a single wildcard pattern
 - **New candidates**: frequently denied/used tools from logs that should be added to the allow list
 
-Scope-aware: in project scope, also detects cross-scope redundancies (project entries already covered by global settings). Uses both `tool_denial` and `tool_use` log entries for evidence-based suggestions.
+Scope-aware: in project scope, also detects cross-scope redundancies (project entries already covered by global settings). Changes are written back to the correct file (machine-specific patterns to `settings.local.json`, general patterns to `settings.json`).
 
 ```bash
 # Or run the analysis script directly:
 python3 skills/promptforge/scripts/extract_permissions.py \
   --settings-file ~/.claude/settings.json \
+  --local-settings-file ~/.claude/settings.local.json \
   --logs-dir ~/.promptforge/logs/ \
   --output /tmp/promptforge-permissions-data.json
 ```

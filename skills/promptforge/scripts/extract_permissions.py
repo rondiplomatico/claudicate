@@ -127,7 +127,9 @@ def find_redundancies(patterns, context_patterns=None):
             if is_subsumed(broad, narrow):
                 redundant.append({
                     "entry": narrow["raw"],
+                    "entry_source": narrow.get("source", ""),
                     "subsumed_by": broad["raw"],
+                    "subsumed_by_source": broad.get("source", ""),
                     "scope": "within",
                     "explanation": f'"{narrow["raw"]}" is already covered by "{broad["raw"]}"',
                 })
@@ -147,7 +149,9 @@ def find_redundancies(patterns, context_patterns=None):
                 if is_subsumed(broad, narrow):
                     redundant.append({
                         "entry": narrow["raw"],
+                        "entry_source": narrow.get("source", ""),
                         "subsumed_by": broad["raw"],
+                        "subsumed_by_source": broad.get("source", ""),
                         "scope": "cross",
                         "explanation": f'"{narrow["raw"]}" is already covered by global pattern "{broad["raw"]}"',
                     })
@@ -320,18 +324,32 @@ def find_duplicates(patterns):
     duplicates = []
     for i, p in enumerate(patterns):
         if p["raw"] in seen:
-            duplicates.append({"entry": p["raw"], "index": i, "first_index": seen[p["raw"]]})
+            duplicates.append({"entry": p["raw"], "index": i, "first_index": seen[p["raw"]], "source": p.get("source", "")})
         else:
             seen[p["raw"]] = i
     return duplicates
 
 
+def load_settings_allow(path):
+    """Load the permissions.allow list from a settings file. Returns [] if missing."""
+    p = Path(path)
+    if not p.exists():
+        return []
+    with open(p, 'r', encoding='utf-8') as f:
+        settings = json.load(f)
+    return settings.get("permissions", {}).get("allow", [])
+
+
 def main():
     parser = argparse.ArgumentParser(description="Analyze settings.json permissions for optimization")
     parser.add_argument("--settings-file", required=True,
-                        help="Primary target settings.json to analyze and modify")
+                        help="Primary settings.json (shared/versioned)")
+    parser.add_argument("--local-settings-file",
+                        help="Companion settings.local.json (personal, not versioned)")
     parser.add_argument("--context-settings",
-                        help="Secondary settings.json for cross-scope redundancy detection (read-only)")
+                        help="Global settings.json for cross-scope redundancy detection (read-only)")
+    parser.add_argument("--context-local-settings",
+                        help="Global settings.local.json for cross-scope redundancy detection (read-only)")
     parser.add_argument("--logs-dir", action="append", default=[],
                         help="Log directory (repeatable)")
     parser.add_argument("--project-filter",
@@ -344,40 +362,42 @@ def main():
                         help="Output JSON file")
     args = parser.parse_args()
 
-    # Load primary settings
-    settings_path = Path(args.settings_file)
-    if not settings_path.exists():
-        print(f"Error: Settings file not found: {args.settings_file}", file=sys.stderr)
-        sys.exit(1)
+    # Load primary settings (shared + local)
+    shared_allow = load_settings_allow(args.settings_file)
+    local_allow = load_settings_allow(args.local_settings_file) if args.local_settings_file else []
 
-    with open(settings_path, 'r', encoding='utf-8') as f:
-        settings = json.load(f)
+    # Tag each pattern with its source file
+    shared_patterns = [parse_pattern(raw) for raw in shared_allow]
+    for p in shared_patterns:
+        p["source"] = args.settings_file
+    local_patterns = [parse_pattern(raw) for raw in local_allow]
+    for p in local_patterns:
+        p["source"] = args.local_settings_file
 
-    allow_list = settings.get("permissions", {}).get("allow", [])
-    deny_list = settings.get("permissions", {}).get("deny", [])
+    # Combined = all patterns that apply at this scope
+    patterns = shared_patterns + local_patterns
 
-    if not allow_list:
-        print("No permission entries found in allow list.", file=sys.stderr)
+    if not patterns:
+        print("No permission entries found in allow lists.", file=sys.stderr)
         result = {"error": "no_data", "message": "No entries in permissions.allow"}
         Path(args.output).write_text(json.dumps(result, indent=2))
         sys.exit(0)
 
-    # Parse patterns
-    patterns = [parse_pattern(raw) for raw in allow_list]
-
-    # Load context settings for cross-scope analysis
+    # Load context settings for cross-scope analysis (global shared + local)
     context_patterns = None
-    if args.context_settings:
-        ctx_path = Path(args.context_settings)
-        if ctx_path.exists():
-            with open(ctx_path, 'r', encoding='utf-8') as f:
-                ctx_settings = json.load(f)
-            ctx_allow = ctx_settings.get("permissions", {}).get("allow", [])
-            context_patterns = [parse_pattern(raw) for raw in ctx_allow]
+    ctx_files = [f for f in [args.context_settings, args.context_local_settings] if f]
+    if ctx_files:
+        context_patterns = []
+        for cf in ctx_files:
+            ctx_allow = load_settings_allow(cf)
+            ctx_parsed = [parse_pattern(raw) for raw in ctx_allow]
+            for p in ctx_parsed:
+                p["source"] = cf
+            context_patterns.extend(ctx_parsed)
 
-    print(f"Analyzing {len(patterns)} permission entries from {args.settings_file}")
+    print(f"Analyzing {len(shared_patterns)} shared + {len(local_patterns)} local permission entries")
     if context_patterns:
-        print(f"Cross-referencing with {len(context_patterns)} entries from {args.context_settings}")
+        print(f"Cross-referencing with {len(context_patterns)} entries from context settings")
 
     # Analysis
     duplicates = find_duplicates(patterns)
@@ -409,9 +429,13 @@ def main():
     projected = len(patterns) - removable - generalizable_entries + len(generalizable) + len(candidates)
 
     result = {
-        "settings_file": str(settings_path),
+        "settings_file": args.settings_file,
+        "local_settings_file": args.local_settings_file,
         "context_file": args.context_settings,
+        "context_local_file": args.context_local_settings,
         "total_entries": len(patterns),
+        "shared_entries": len(shared_patterns),
+        "local_entries": len(local_patterns),
         "analysis": {
             "duplicates": duplicates,
             "redundant": redundancies,
@@ -436,7 +460,7 @@ def main():
     print(f"Permission analysis written to {args.output}")
 
     print(f"\nSummary:")
-    print(f"  Total entries: {len(patterns)}")
+    print(f"  Total entries: {len(patterns)} ({len(shared_patterns)} shared, {len(local_patterns)} local)")
     print(f"  Duplicates: {len(duplicates)}")
     print(f"  Redundant (within scope): {result['summary']['redundant_within']}")
     print(f"  Redundant (cross scope): {result['summary']['redundant_cross']}")

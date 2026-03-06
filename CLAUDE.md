@@ -51,7 +51,7 @@ Analysis scripts co-located in `skills/promptforge/scripts/`:
 - `analyze_usage.py` — generates usage report (volume, time patterns, token usage, tags); excludes agent sessions by default (`--include-agents` to include)
 - `analyze_agents.py` — agent-specific analysis (overview, prompt characteristics, friction, parent-child session correlation, complexity)
 - `extract_friction.py` — pre-aggregates friction signals (denials, negations, contradictions, repeated clarifications) into JSON; excludes agent sessions by default (`--include-agents` to include)
-- `extract_permissions.py` — analyzes settings.json permissions for redundancies, anomalies, generalization opportunities, and new candidates from tool usage/denial logs
+- `extract_permissions.py` — analyzes permissions across `settings.json` (shared) and `settings.local.json` (personal) for redundancies, anomalies, generalization opportunities, and new candidates from tool usage/denial logs; tracks which file each entry comes from
 
 All analysis scripts support `--logs-dir` (repeatable), `--since`, auto-discover log directories, and `--project-filter DIR` to restrict analysis to entries from a specific project.
 
@@ -80,7 +80,7 @@ skills/promptforge/
 Two workflow chains:
 - **User friction**: `analyze-corrections` (generates friction report) → `improve-project` or `improve-bmad` (consumes friction report, cross-references with current config, suggests changes)
 - **Agent improvement**: `analyze-agents` (agent session analysis) + friction report → `improve-agents` (suggests agent prompt, skill, and instruction improvements)
-- **Permission optimization**: `improve-permissions` (analyzes settings.json for redundancies, consolidation, and new candidates from tool usage/denial logs; scope-aware with cross-scope redundancy detection)
+- **Permission optimization**: `improve-permissions` (analyzes both `settings.json` and `settings.local.json` for redundancies, consolidation, and new candidates from tool usage/denial logs; scope-aware with cross-scope redundancy detection; writes changes back to the correct file)
 
 ### Installation (`install.sh`, `uninstall.sh`)
 Interactive scripts (no CLI args). Install supports link (symlink) or copy mode. Data (hooks, logs, schema, config) goes to `.promptforge/`; skills go to `.claude/skills/`. Hook entries are registered in the appropriate settings file: **global installs** use `.claude/settings.json` (Claude Code doesn't support `settings.local.json` at the global `~/.claude/` level), **project installs** use `.claude/settings.local.json` (local, not committed — hooks use absolute paths and write to local `.promptforge/`). Writes `install.manifest` and `setup.yaml` with install metadata. For project installs in git repos, offers to add `.promptforge/` to `.gitignore` (warns about log data exposure if skipped). Uninstall reads manifest for clean removal.

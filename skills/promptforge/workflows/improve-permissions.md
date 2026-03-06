@@ -1,6 +1,19 @@
 # Improve Permissions
 
-Analyze and optimize Claude Code permission patterns in settings.json. Detects redundancies, anomalies, generalization opportunities, and suggests new patterns from tool usage logs.
+Analyze and optimize Claude Code permission patterns across `settings.json` (shared/versioned) and `settings.local.json` (personal/local). Detects redundancies, anomalies, generalization opportunities, and suggests new patterns from tool usage logs.
+
+## Settings File Layout
+
+Claude Code merges permissions from multiple files (deny → ask → allow, first match wins):
+
+| File | Purpose | Versioned? |
+|------|---------|------------|
+| `~/.claude/settings.json` | Global shared settings | No (user home) |
+| `~/.claude/settings.local.json` | Global personal settings | No |
+| `<project>/.claude/settings.json` | Project shared settings | Yes (committed) |
+| `<project>/.claude/settings.local.json` | Project personal settings | No (gitignored) |
+
+Both `settings.json` and `settings.local.json` at each scope are merged. The analysis reads all applicable files; changes are written to the correct file based on which one contains the entry.
 
 ## Steps
 
@@ -8,10 +21,15 @@ Analyze and optimize Claude Code permission patterns in settings.json. Detects r
 
 Based on scope variables from the scope preamble:
 
-- **Project scope**: primary = `$SCOPE_TARGET_DIR/.claude/settings.json`, context = `~/.claude/settings.json`
-- **Global scope**: primary = `~/.claude/settings.json`, no context file
-
-Also check if `settings.local.json` exists alongside the primary file. If so, note its contents but target the shared settings file.
+- **Project scope**:
+  - shared = `$SCOPE_TARGET_DIR/.claude/settings.json`
+  - local = `$SCOPE_TARGET_DIR/.claude/settings.local.json`
+  - context-shared = `~/.claude/settings.json`
+  - context-local = `~/.claude/settings.local.json`
+- **Global scope**:
+  - shared = `~/.claude/settings.json`
+  - local = `~/.claude/settings.local.json`
+  - no context files
 
 ### 2. Run analysis
 
@@ -19,8 +37,10 @@ Run the `extract_permissions.py` script from the `scripts/` directory:
 
 ```
 python3 scripts/extract_permissions.py \
-  --settings-file <primary> \
-  [--context-settings <context>] \
+  --settings-file <shared> \
+  [--local-settings-file <local>] \
+  [--context-settings <context-shared>] \
+  [--context-local-settings <context-local>] \
   --logs-dir ~/.promptforge/logs/ \
   [--logs-dir <project>/.promptforge/logs/] \
   [$SCOPE_PROJECT_FILTER] \
@@ -29,26 +49,26 @@ python3 scripts/extract_permissions.py \
 
 ### 3. Read and present findings
 
-Read the output JSON. Present findings organized by category:
+Read the output JSON. Each finding includes `source` / `entry_source` fields indicating which file the entry lives in. Present findings organized by category:
 
 #### a. Duplicates
-Exact duplicate entries. Safe to remove — just list them.
+Exact duplicate entries (may be within one file or across shared/local). Safe to remove — just list them with their source file.
 
 #### b. Redundant entries
 Entries subsumed by broader patterns. For each:
-- **Remove**: the redundant entry
-- **Kept by**: the broader pattern that already covers it
-- **Scope**: "within" (same file) or "cross" (covered by global settings)
+- **Remove**: the redundant entry (and which file it's in)
+- **Kept by**: the broader pattern that already covers it (and which file)
+- **Scope**: "within" (same scope) or "cross" (covered by global settings)
 
 #### c. Anomalies
 Malformed or suspicious entries (bash comments, broken syntax). For each:
-- **Entry**: the problematic pattern
+- **Entry**: the problematic pattern (and which file)
 - **Issue**: what's wrong
 - **Suggestion**: remove or fix
 
 #### d. Generalizable groups
 Multiple exact-match entries that share a common pattern. For each group:
-- **Entries**: the specific patterns being consolidated
+- **Entries**: the specific patterns being consolidated (and which files)
 - **Conservative proposal**: preserves subcommand specificity (e.g., `Bash(git -C * diff:*)`)
 - **Broad proposal**: wider scope (e.g., `Bash(git:*)`)
 - **Risk note**: explain what additional commands the broader pattern would allow
@@ -56,6 +76,7 @@ Multiple exact-match entries that share a common pattern. For each group:
 #### e. New candidates
 Frequently used/denied tools not covered by current patterns. For each:
 - **Proposed pattern**: the new allow entry
+- **Target file**: suggest `settings.local.json` for machine-specific patterns (absolute paths), `settings.json` for general patterns
 - **Evidence**: how many times it appeared in logs, with examples
 - **Source**: from denials, successful uses, or both
 
@@ -63,6 +84,7 @@ Frequently used/denied tools not covered by current patterns. For each:
 
 Present all suggestions as a numbered list. Each suggestion has:
 - **What**: the specific add/remove/replace
+- **Where**: which settings file will be modified
 - **Why**: the evidence (redundancy, frequency, anomaly)
 - **Risk**: Low (removing redundant) / Medium (generalizing) / High (new broad pattern)
 
@@ -70,9 +92,9 @@ Ask the user which suggestions to apply (can select multiple by number, or "all"
 
 ### 5. Apply changes
 
-After user approval, read the target settings.json, modify the `permissions.allow` array:
-1. Remove entries marked for removal
-2. Replace generalized groups (remove old entries, add consolidated pattern)
-3. Add new candidate patterns
+After user approval, read each target settings file, modify its `permissions.allow` array:
+1. Remove entries marked for removal (from the file that contains them)
+2. Replace generalized groups (remove old entries, add consolidated pattern to the appropriate file)
+3. Add new candidate patterns to the appropriate file
 
-Write the updated settings.json back, preserving all other fields (hooks, deny, ask, additionalDirectories, etc.).
+Write each updated file back, preserving all other fields (hooks, deny, ask, additionalDirectories, etc.). Machine-specific patterns (containing absolute paths) go to `settings.local.json`; general patterns go to `settings.json`.

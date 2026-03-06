@@ -11,8 +11,8 @@ Run `/promptforge analyze-corrections` first to generate a Friction Report. If n
 ### 1. Gather context via task agent
 
 Spawn a task agent to read and summarize config files at `$SCOPE_TARGET_DIR`:
-- **Project scope**: `CLAUDE.md`, `.claude/settings.json`, project memory files (`~/.claude/projects/*/memory/`)
-- **Global scope**: `~/.claude/CLAUDE.md`, `~/.claude/settings.json`, `~/.claude/memory/*`
+- **Project scope**: `CLAUDE.md`, `.claude/settings.json`, `.claude/settings.local.json`, project memory files (`~/.claude/projects/*/memory/`)
+- **Global scope**: `~/.claude/CLAUDE.md`, `~/.claude/settings.json`, `~/.claude/settings.local.json`, `~/.claude/memory/*`
 
 > Return a condensed summary organized as:
 > 1. **Key CLAUDE.md instructions** (one line each)
