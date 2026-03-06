@@ -194,6 +194,11 @@ UPDATED=$(jq --arg hdir "$HOOKS_DIR" '
       "timeout": 5000
     },
     {
+      "event": "PostToolUse",
+      "command": ($hdir + "/log-tool-use.sh"),
+      "timeout": 5000
+    },
+    {
       "event": "Stop",
       "command": ($hdir + "/log-stop.sh"),
       "timeout": 10000
@@ -202,7 +207,7 @@ UPDATED=$(jq --arg hdir "$HOOKS_DIR" '
 ' "$SETTINGS_FILE")
 
 echo "$UPDATED" > "$SETTINGS_FILE"
-echo "  Updated  $SETTINGS_FILE (4 hook entries)"
+echo "  Updated  $SETTINGS_FILE (5 hook entries)"
 
 # Check if old log-prompts.sh was removed
 if echo "$UPDATED" | jq -e '.hooks | map(select(.command | tostring | contains("log-prompts.sh"))) | length == 0' >/dev/null 2>&1; then

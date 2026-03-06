@@ -19,6 +19,7 @@ Usage: `/promptforge <workflow>` or `/promptforge` to choose interactively.
 | `improve-project` | Suggest improvements to CLAUDE.md, permissions, and memory files |
 | `improve-bmad` | Suggest improvements to BMAD agent and task definitions |
 | `improve-agents` | Suggest improvements to agent behavior and configuration |
+| `improve-permissions` | Optimize settings.json permission patterns (redundancies, consolidation, new candidates) |
 
 ## Routing
 

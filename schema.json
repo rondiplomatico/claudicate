@@ -12,7 +12,7 @@
     },
     "event_type": {
       "type": "string",
-      "enum": ["prompt", "ask_response", "tool_denial", "turn_end"],
+      "enum": ["prompt", "ask_response", "tool_denial", "tool_use", "turn_end"],
       "description": "Type of interaction event"
     },
     "session_id": {
@@ -55,6 +55,14 @@
       "type": "boolean",
       "description": "Whether the denial was a user interrupt (event_type=tool_denial only)"
     },
+    "tool_name": {
+      "type": "string",
+      "description": "Name of the tool used (event_type=tool_use only)"
+    },
+    "tool_input": {
+      "type": "object",
+      "description": "Tool input, truncated to 500 chars (event_type=tool_use only)"
+    },
     "model": {
       "type": "string",
       "description": "Model ID used for this turn (event_type=turn_end only)"
@@ -87,6 +95,10 @@
     {
       "if": { "properties": { "event_type": { "const": "tool_denial" } } },
       "then": { "required": ["denied_tool"] }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "tool_use" } } },
+      "then": { "required": ["tool_name"] }
     }
   ]
 }

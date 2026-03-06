@@ -1,6 +1,6 @@
 # PromptForge
 
-A self-improvement toolkit for Claude Code. Captures user interactions (prompts, clarification answers, tool denials, turn metadata) as structured JSONL, then analyzes friction patterns and suggests improvements to your project configuration and BMAD setup.
+A self-improvement toolkit for Claude Code. Captures user interactions (prompts, clarification answers, tool denials, tool uses, turn metadata) as structured JSONL, then analyzes friction patterns and suggests improvements to your project configuration, permissions, and BMAD setup.
 
 Agent sessions (from Claude Code sub-agents) are automatically detected and tagged. Analysis scripts exclude agent noise by default (`--include-agents` to opt in), and dedicated agent analysis tools let you inspect and improve agent behavior separately.
 
@@ -77,6 +77,25 @@ Uses agent analysis and friction data to suggest improvements to agent prompts, 
 
 **Requires**: Run `analyze-corrections` first. Works best after `analyze-agents` too.
 
+### `/promptforge improve-permissions` — Permission Optimization
+
+Analyzes your `settings.json` permission patterns and suggests optimizations:
+
+- **Redundancies**: entries already covered by broader patterns (e.g., `Bash(grep -h:*)` when `Bash(grep:*)` exists)
+- **Anomalies**: malformed entries (bash comments, broken syntax)
+- **Consolidation**: groups of one-off exact commands that can be replaced by a single wildcard pattern
+- **New candidates**: frequently denied/used tools from logs that should be added to the allow list
+
+Scope-aware: in project scope, also detects cross-scope redundancies (project entries already covered by global settings). Uses both `tool_denial` and `tool_use` log entries for evidence-based suggestions.
+
+```bash
+# Or run the analysis script directly:
+python3 skills/promptforge/scripts/extract_permissions.py \
+  --settings-file ~/.claude/settings.json \
+  --logs-dir ~/.claude/promptforge/logs/ \
+  --output /tmp/promptforge-permissions-data.json
+```
+
 ### Recommended Workflow
 
 **User-focused improvement:**
@@ -84,6 +103,10 @@ Uses agent analysis and friction data to suggest improvements to agent prompts, 
 2. `/promptforge analyze-usage` — understand your patterns
 3. `/promptforge analyze-corrections` — generate friction report
 4. `/promptforge improve-project` and/or `/promptforge improve-bmad` — get actionable suggestions
+
+**Permission cleanup:**
+1. Use Claude Code normally to accumulate tool usage/denial logs
+2. `/promptforge improve-permissions` — get redundancy, consolidation, and new pattern suggestions
 
 **Agent-focused improvement:**
 1. `/promptforge analyze-agents` — understand agent usage patterns
