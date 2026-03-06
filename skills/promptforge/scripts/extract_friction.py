@@ -209,7 +209,7 @@ def analyze_correction_chains(entries):
 
 def main():
     parser = argparse.ArgumentParser(description="Pre-filter friction signals from promptforge logs")
-    parser.add_argument("--logs-dir", default=os.path.expanduser("~/.claude/promptforge/logs/"),
+    parser.add_argument("--logs-dir", default=os.path.expanduser("~/.promptforge/logs/"),
                         help="Logs directory")
     parser.add_argument("--project-logs-dir", help="Additional project-specific logs directory")
     parser.add_argument("--project-filter", help="Only include entries matching this project directory")

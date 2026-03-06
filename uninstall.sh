@@ -1,6 +1,6 @@
 #!/bin/bash
 # promptforge uninstaller — interactive, no CLI arguments
-# Removes hooks, skill, and optionally logs from a target .claude/ directory
+# Removes hooks, skill, and optionally logs from a target directory
 set -e
 
 echo "=== promptforge uninstaller ==="
@@ -14,7 +14,7 @@ fi
 
 # --- [1] Uninstall target ---
 echo "[1] Uninstall target"
-echo "    (g) Global (~/.claude/)"
+echo "    (g) Global (~/.promptforge/ + ~/.claude/)"
 echo "    (p) Project — enter path"
 echo "    (.) Current directory ($(pwd))"
 printf "    > "
@@ -22,7 +22,7 @@ read -r TARGET_CHOICE
 
 case "$TARGET_CHOICE" in
   g)
-    TARGET_CLAUDE_DIR="$HOME/.claude"
+    TARGET_BASE="$HOME"
     ;;
   p)
     printf "    Enter project path: "
@@ -31,10 +31,10 @@ case "$TARGET_CHOICE" in
       echo "Error: Directory '$PROJECT_PATH' does not exist."
       exit 1
     fi
-    TARGET_CLAUDE_DIR="$PROJECT_PATH/.claude"
+    TARGET_BASE="$PROJECT_PATH"
     ;;
   .)
-    TARGET_CLAUDE_DIR="$(pwd)/.claude"
+    TARGET_BASE="$(pwd)"
     ;;
   *)
     echo "Error: Invalid choice '$TARGET_CHOICE'. Use g, p, or ."
@@ -42,24 +42,32 @@ case "$TARGET_CHOICE" in
     ;;
 esac
 
-MANIFEST="$TARGET_CLAUDE_DIR/promptforge/install.manifest"
+TARGET_PF_DIR="$TARGET_BASE/.promptforge"
+TARGET_CLAUDE_DIR="$TARGET_BASE/.claude"
+
+# Check both old and new locations for manifest
+MANIFEST="$TARGET_PF_DIR/install.manifest"
+if [ ! -f "$MANIFEST" ]; then
+  # Fall back to old location
+  MANIFEST="$TARGET_CLAUDE_DIR/promptforge/install.manifest"
+fi
 
 if [ ! -f "$MANIFEST" ]; then
   echo ""
-  echo "Error: No install manifest found at $MANIFEST"
-  echo "promptforge does not appear to be installed at $TARGET_CLAUDE_DIR."
+  echo "Error: No install manifest found."
+  echo "promptforge does not appear to be installed at $TARGET_BASE."
   exit 1
 fi
 
 ENTRY_COUNT=$(wc -l < "$MANIFEST")
 echo ""
-echo "  Found manifest with $ENTRY_COUNT entries at $TARGET_CLAUDE_DIR"
+echo "  Found manifest with $ENTRY_COUNT entries"
 echo ""
 
 # --- [2] WARNING ---
 echo "    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo "    !!  WARNING: THIS WILL REMOVE ALL PROMPTFORGE FILES FROM  !!"
-echo "    !!  $TARGET_CLAUDE_DIR"
+echo "    !!  $TARGET_BASE"
 echo "    !!  THIS ACTION CANNOT BE UNDONE.                         !!"
 echo "    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo ""
@@ -139,24 +147,30 @@ check_user_files() {
   fi
 }
 
-check_user_files "$TARGET_CLAUDE_DIR/promptforge/hooks" "promptforge/hooks/"
-check_user_files "$TARGET_CLAUDE_DIR/skills/promptforge" "skills/promptforge/"
+check_user_files "$TARGET_PF_DIR/hooks" ".promptforge/hooks/"
+check_user_files "$TARGET_CLAUDE_DIR/skills/promptforge" ".claude/skills/promptforge/"
 
 # Also check old layout directories from previous installs
-check_user_files "$TARGET_CLAUDE_DIR/commands/promptforge" "commands/promptforge/"
+check_user_files "$TARGET_CLAUDE_DIR/promptforge/hooks" ".claude/promptforge/hooks/"
+check_user_files "$TARGET_CLAUDE_DIR/commands/promptforge" ".claude/commands/promptforge/"
 for skill_dir in "$TARGET_CLAUDE_DIR/skills/promptforge-"*/; do
   [ -d "$skill_dir" ] || continue
-  check_user_files "$skill_dir" "skills/$(basename "$skill_dir")/"
+  check_user_files "$skill_dir" ".claude/skills/$(basename "$skill_dir")/"
 done
 
 echo ""
 
 # --- [6] Log data ---
-LOG_DIR="$TARGET_CLAUDE_DIR/promptforge/logs"
+LOG_DIR="$TARGET_PF_DIR/logs"
+# Also check old location
+if [ ! -d "$LOG_DIR" ]; then
+  LOG_DIR="$TARGET_CLAUDE_DIR/promptforge/logs"
+fi
+
 if [ -d "$LOG_DIR" ]; then
   LOG_COUNT=$(find "$LOG_DIR" -type f 2>/dev/null | wc -l)
   if [ "$LOG_COUNT" -gt 0 ]; then
-    echo "[6] Found $LOG_COUNT log file(s) in promptforge/logs/"
+    echo "[6] Found $LOG_COUNT log file(s) in $LOG_DIR"
     echo "    (k) Keep logs"
     echo "    (d) Delete logs"
     printf "    > "
@@ -177,6 +191,9 @@ echo "[7] Cleaning up empty directories..."
 rm -f "$MANIFEST"
 echo "  Removed  $MANIFEST"
 
+# Remove setup.yaml
+rm -f "$TARGET_PF_DIR/setup.yaml"
+
 # Remove directories if empty
 cleanup_dir() {
   local dir="$1"
@@ -186,25 +203,31 @@ cleanup_dir() {
   fi
 }
 
-cleanup_dir "$TARGET_CLAUDE_DIR/promptforge/hooks"
+# New layout
+cleanup_dir "$TARGET_PF_DIR/hooks"
+cleanup_dir "$TARGET_PF_DIR/logs"
+cleanup_dir "$TARGET_PF_DIR"
+
+# .claude skill dirs
 cleanup_dir "$TARGET_CLAUDE_DIR/skills/promptforge"
 
-# Also clean up old layout directories from previous installs
+# Old layout cleanup
+cleanup_dir "$TARGET_CLAUDE_DIR/promptforge/hooks"
+cleanup_dir "$TARGET_CLAUDE_DIR/promptforge/logs"
+cleanup_dir "$TARGET_CLAUDE_DIR/promptforge"
 cleanup_dir "$TARGET_CLAUDE_DIR/commands/promptforge"
 for skill_dir in "$TARGET_CLAUDE_DIR/skills/promptforge-"*/; do
   [ -d "$skill_dir" ] || continue
   cleanup_dir "$skill_dir"
 done
 
-cleanup_dir "$TARGET_CLAUDE_DIR/promptforge/logs"
-cleanup_dir "$TARGET_CLAUDE_DIR/promptforge"
 cleanup_dir "$TARGET_CLAUDE_DIR/commands"
 cleanup_dir "$TARGET_CLAUDE_DIR/skills"
 
 echo ""
 
 # --- [8] Summary ---
-echo "Done! promptforge has been uninstalled from $TARGET_CLAUDE_DIR."
+echo "Done! promptforge has been uninstalled from $TARGET_BASE."
 if [ -d "$LOG_DIR" ]; then
   echo "  Note: Log data was kept at $LOG_DIR"
 fi

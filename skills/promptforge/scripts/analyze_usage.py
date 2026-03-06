@@ -49,12 +49,12 @@ def load_logs(dirs, since_date=None):
 def discover_log_dirs():
     """Auto-discover promptforge log directories."""
     dirs = []
-    global_dir = os.path.expanduser("~/.claude/promptforge/logs")
+    global_dir = os.path.expanduser("~/.promptforge/logs")
     if os.path.isdir(global_dir):
         dirs.append(global_dir)
     proj_dir = os.environ.get("CLAUDE_PROJECT_DIR")
     if proj_dir:
-        project_logs = os.path.join(proj_dir, ".claude", "promptforge", "logs")
+        project_logs = os.path.join(proj_dir, ".promptforge", "logs")
         if os.path.isdir(project_logs):
             dirs.append(project_logs)
     return dirs
@@ -88,8 +88,8 @@ def main():
     log_dirs = args.logs_dir if args.logs_dir else discover_log_dirs()
     if not log_dirs:
         print("No log directories found. Checked:")
-        print(f"  ~/.claude/promptforge/logs/")
-        print(f"  $CLAUDE_PROJECT_DIR/.claude/promptforge/logs/")
+        print(f"  ~/.promptforge/logs/")
+        print(f"  $CLAUDE_PROJECT_DIR/.promptforge/logs/")
         print("\nRun the PromptForge installer or use extract-sessions.py for backfill.")
         sys.exit(1)
 

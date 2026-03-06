@@ -21,8 +21,8 @@ Run the `extract_permissions.py` script from the `scripts/` directory:
 python3 scripts/extract_permissions.py \
   --settings-file <primary> \
   [--context-settings <context>] \
-  --logs-dir ~/.claude/promptforge/logs/ \
-  [--logs-dir <project>/.claude/promptforge/logs/] \
+  --logs-dir ~/.promptforge/logs/ \
+  [--logs-dir <project>/.promptforge/logs/] \
   [$SCOPE_PROJECT_FILTER] \
   --output /tmp/promptforge-permissions-data.json
 ```

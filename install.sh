@@ -1,6 +1,6 @@
 #!/bin/bash
 # promptforge installer — interactive, no CLI arguments
-# Installs hooks and skill to a target .claude/ directory
+# Installs hooks, scripts, and skill to a target directory
 set -e
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -23,7 +23,7 @@ echo ""
 
 # --- [1] Install target ---
 echo "[1] Install target"
-echo "    (g) Global (~/.claude/)"
+echo "    (g) Global (~/.promptforge/ + ~/.claude/)"
 echo "    (p) Project — enter path"
 echo "    (.) Current directory ($(pwd))"
 printf "    > "
@@ -31,7 +31,7 @@ read -r TARGET_CHOICE
 
 case "$TARGET_CHOICE" in
   g)
-    TARGET_CLAUDE_DIR="$HOME/.claude"
+    TARGET_BASE="$HOME"
     ;;
   p)
     printf "    Enter project path: "
@@ -40,16 +40,19 @@ case "$TARGET_CHOICE" in
       echo "Error: Directory '$PROJECT_PATH' does not exist."
       exit 1
     fi
-    TARGET_CLAUDE_DIR="$PROJECT_PATH/.claude"
+    TARGET_BASE="$PROJECT_PATH"
     ;;
   .)
-    TARGET_CLAUDE_DIR="$(pwd)/.claude"
+    TARGET_BASE="$(pwd)"
     ;;
   *)
     echo "Error: Invalid choice '$TARGET_CHOICE'. Use g, p, or ."
     exit 1
     ;;
 esac
+
+TARGET_PF_DIR="$TARGET_BASE/.promptforge"
+TARGET_CLAUDE_DIR="$TARGET_BASE/.claude"
 echo ""
 
 # --- [2] Install mode ---
@@ -70,7 +73,7 @@ esac
 echo ""
 
 # --- Execute installation ---
-echo "Installing to $TARGET_CLAUDE_DIR using ${INSTALL_MODE}s..."
+echo "Installing to $TARGET_PF_DIR (data) + $TARGET_CLAUDE_DIR (skill/hooks config)..."
 
 # Helper: install a file (symlink or copy)
 install_file() {
@@ -103,21 +106,32 @@ install_dir() {
   fi
 }
 
-# Create directories
-mkdir -p "$TARGET_CLAUDE_DIR/promptforge/logs"
-echo "  Created  $TARGET_CLAUDE_DIR/promptforge/logs/"
-mkdir -p "$TARGET_CLAUDE_DIR/promptforge/hooks"
+# Create .promptforge directories
+mkdir -p "$TARGET_PF_DIR/logs"
+echo "  Created  $TARGET_PF_DIR/logs/"
+mkdir -p "$TARGET_PF_DIR/hooks"
 
-# Install hook scripts
+# Install hook scripts to .promptforge/hooks/
 chmod +x "$REPO_DIR/hooks/"*.sh
 for hook in "$REPO_DIR/hooks/"*.sh; do
-  install_file "$hook" "$TARGET_CLAUDE_DIR/promptforge/hooks/$(basename "$hook")"
+  install_file "$hook" "$TARGET_PF_DIR/hooks/$(basename "$hook")"
 done
 
 # Always copy schema (small file)
-cp "$REPO_DIR/schema.json" "$TARGET_CLAUDE_DIR/promptforge/schema.json"
-echo "  Copied   $TARGET_CLAUDE_DIR/promptforge/schema.json"
-MANIFEST_FILES+=("$TARGET_CLAUDE_DIR/promptforge/schema.json")
+cp "$REPO_DIR/schema.json" "$TARGET_PF_DIR/schema.json"
+echo "  Copied   $TARGET_PF_DIR/schema.json"
+MANIFEST_FILES+=("$TARGET_PF_DIR/schema.json")
+
+# Migrate: remove old .claude/promptforge/ layout from previous installs
+if [ -d "$TARGET_CLAUDE_DIR/promptforge" ]; then
+  # Preserve logs if they exist in old location
+  if [ -d "$TARGET_CLAUDE_DIR/promptforge/logs" ] && [ "$(ls -A "$TARGET_CLAUDE_DIR/promptforge/logs" 2>/dev/null)" ]; then
+    echo "  Migrating logs from .claude/promptforge/logs/ to .promptforge/logs/..."
+    cp -n "$TARGET_CLAUDE_DIR/promptforge/logs/"*.jsonl "$TARGET_PF_DIR/logs/" 2>/dev/null || true
+  fi
+  rm -rf "$TARGET_CLAUDE_DIR/promptforge"
+  echo "  Migrated: removed old .claude/promptforge/"
+fi
 
 # Migrate: remove old command/skill layout from previous installs
 if [ -d "$TARGET_CLAUDE_DIR/commands/promptforge" ]; then
@@ -131,13 +145,13 @@ for old_skill in "$TARGET_CLAUDE_DIR/skills/promptforge-"*/; do
   echo "  Migrated: removed old $(basename "$old_skill")/"
 done
 
-# Install unified skill
+# Install unified skill to .claude/skills/
 mkdir -p "$TARGET_CLAUDE_DIR/skills"
 install_dir "$REPO_DIR/skills/promptforge" "$TARGET_CLAUDE_DIR/skills/promptforge"
 
 # --- Write install manifest ---
-printf '%s\n' "${MANIFEST_FILES[@]}" > "$TARGET_CLAUDE_DIR/promptforge/install.manifest"
-echo "  Written  $TARGET_CLAUDE_DIR/promptforge/install.manifest (${#MANIFEST_FILES[@]} entries)"
+printf '%s\n' "${MANIFEST_FILES[@]}" > "$TARGET_PF_DIR/install.manifest"
+echo "  Written  $TARGET_PF_DIR/install.manifest (${#MANIFEST_FILES[@]} entries)"
 
 # --- Write setup.yaml ---
 case "$TARGET_CHOICE" in
@@ -155,8 +169,8 @@ esac
   for f in "${MANIFEST_FILES[@]}"; do
     echo "  - $f"
   done
-} > "$TARGET_CLAUDE_DIR/promptforge/setup.yaml"
-echo "  Written  $TARGET_CLAUDE_DIR/promptforge/setup.yaml"
+} > "$TARGET_PF_DIR/setup.yaml"
+echo "  Written  $TARGET_PF_DIR/setup.yaml"
 
 # --- Update settings.json with hook entries ---
 SETTINGS_FILE="$TARGET_CLAUDE_DIR/settings.json"
@@ -166,7 +180,7 @@ if [ ! -f "$SETTINGS_FILE" ]; then
   echo '{}' > "$SETTINGS_FILE"
 fi
 
-HOOKS_DIR="$TARGET_CLAUDE_DIR/promptforge/hooks"
+HOOKS_DIR="$TARGET_PF_DIR/hooks"
 
 # Build the hooks array using jq
 # Read existing settings, remove old promptforge hooks, add new ones
@@ -218,8 +232,62 @@ echo ""
 echo "Done!"
 echo ""
 
-# --- [3] Import existing session data ---
-echo "[3] Import existing session history into promptforge logs?"
+# --- [3] Gitignore check (project installs only) ---
+if [ "$TARGET_CHOICE" != "g" ] && [ -d "$TARGET_BASE/.git" ]; then
+  GITIGNORE="$TARGET_BASE/.gitignore"
+  NEEDS_ADD=true
+
+  if [ -f "$GITIGNORE" ]; then
+    # Check if .promptforge is already ignored (exact line or with trailing slash)
+    if grep -qxF '.promptforge' "$GITIGNORE" 2>/dev/null || \
+       grep -qxF '.promptforge/' "$GITIGNORE" 2>/dev/null || \
+       grep -qxF '/.promptforge' "$GITIGNORE" 2>/dev/null || \
+       grep -qxF '/.promptforge/' "$GITIGNORE" 2>/dev/null; then
+      NEEDS_ADD=false
+      echo "[3] .promptforge/ is already in .gitignore ✓"
+    fi
+  fi
+
+  if [ "$NEEDS_ADD" = true ]; then
+    echo "[3] This is a git repository. .promptforge/ contains usage logs"
+    echo "    (session prompts, tool invocations, timestamps) that should"
+    echo "    NOT be committed to version control."
+    echo ""
+    echo "    (a) Add '.promptforge/' to .gitignore (Recommended)"
+    echo "    (s) Skip — I'll handle it myself"
+    printf "    > "
+    read -r GITIGNORE_CHOICE
+
+    case "$GITIGNORE_CHOICE" in
+      a)
+        # Add with a comment header if .gitignore doesn't exist or doesn't have it
+        if [ ! -f "$GITIGNORE" ]; then
+          echo "# promptforge interaction logs" > "$GITIGNORE"
+          echo ".promptforge/" >> "$GITIGNORE"
+          echo "  Created  $GITIGNORE with .promptforge/ entry"
+        else
+          # Add a blank line separator if file doesn't end with newline
+          [ -s "$GITIGNORE" ] && [ "$(tail -c 1 "$GITIGNORE")" != "" ] && echo "" >> "$GITIGNORE"
+          echo "" >> "$GITIGNORE"
+          echo "# promptforge interaction logs" >> "$GITIGNORE"
+          echo ".promptforge/" >> "$GITIGNORE"
+          echo "  Added    .promptforge/ to $GITIGNORE"
+        fi
+        ;;
+      *)
+        echo ""
+        echo "    ⚠  WARNING: .promptforge/logs/ contains full usage logs including"
+        echo "    session prompts, tool arguments, and timestamps. Without a .gitignore"
+        echo "    entry, this data WILL be committed to version control."
+        echo ""
+        ;;
+    esac
+  fi
+  echo ""
+fi
+
+# --- [4] Import existing session data ---
+echo "[4] Import existing session history into promptforge logs?"
 echo "    (y) Yes — parse existing Claude Code sessions + old prompt logs (may take a moment)"
 echo "    (n) No — start fresh, only capture new interactions going forward"
 printf "    > "
@@ -234,7 +302,7 @@ if [ "$IMPORT_CHOICE" = "y" ]; then
     echo "Importing session history..."
     python3 "$REPO_DIR/scripts/extract-sessions.py" \
       --include-old-logs \
-      --output "$TARGET_CLAUDE_DIR/promptforge/logs/" \
+      --output "$TARGET_PF_DIR/logs/" \
       && echo "Import complete." \
       || echo "Warning: Import encountered errors (partial data may have been written)."
   fi

@@ -149,7 +149,14 @@ def parse_session_jsonl(filepath, since_date=None, project_filter=None):
                                     if prev_tool_use:
                                         denied_tool = prev_tool_use.get("name", "")
                                         inp = prev_tool_use.get("input", {})
-                                        denied_input = json.loads(json.dumps(inp)[:500]) if inp else {}
+                                        if inp:
+                                            serialized = json.dumps(inp)
+                                            if len(serialized) > 500:
+                                                denied_input = {"_truncated": serialized[:500]}
+                                            else:
+                                                denied_input = inp
+                                        else:
+                                            denied_input = {}
                                     entry = {
                                         "timestamp": timestamp or datetime.utcnow().isoformat() + "Z",
                                         "event_type": "tool_denial",
@@ -326,8 +333,8 @@ def main():
     parser.add_argument("--since", help="Only process sessions after this date (YYYY-MM-DD)")
     parser.add_argument("--project", help="Filter by project directory name substring")
     parser.add_argument("--include-old-logs", action="store_true", help="Also convert ~/.claude/prompt-logs/*.log")
-    parser.add_argument("--output", default=os.path.expanduser("~/.claude/promptforge/logs/"),
-                        help="Output directory (default: ~/.claude/promptforge/logs/)")
+    parser.add_argument("--output", default=os.path.expanduser("~/.promptforge/logs/"),
+                        help="Output directory (default: ~/.promptforge/logs/)")
     args = parser.parse_args()
 
     since_date = None

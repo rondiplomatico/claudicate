@@ -387,7 +387,7 @@ def main():
 
     # Load logs for denial/usage analysis
     entries = []
-    log_dirs = args.logs_dir or [os.path.expanduser("~/.claude/promptforge/logs/")]
+    log_dirs = args.logs_dir or [os.path.expanduser("~/.promptforge/logs/")]
     for ld in log_dirs:
         entries.extend(load_logs(ld))
 

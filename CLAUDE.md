@@ -18,7 +18,7 @@ Claude Code events → 5 hook scripts → JSONL daily logs → Python analysis /
 Bash scripts triggered by Claude Code events. All share a common pattern:
 - Read JSON from stdin (`INPUT=$(cat)`)
 - Extract fields with `jq -r`
-- Resolve log directory (project-local `.claude/promptforge/logs/` first, global `~/.claude/promptforge/logs/` fallback)
+- Resolve log directory (project-local `.promptforge/logs/` first, global `~/.promptforge/logs/` fallback)
 - Append one JSON line to `YYYY-MM-DD.jsonl`
 - Use `set -e` and exit 0
 
@@ -78,17 +78,19 @@ Two workflow chains:
 - **Permission optimization**: `improve-permissions` (analyzes settings.json for redundancies, consolidation, and new candidates from tool usage/denial logs; scope-aware with cross-scope redundancy detection)
 
 ### Installation (`install.sh`, `uninstall.sh`)
-Interactive scripts (no CLI args). Install supports link (symlink) or copy mode to global/project/.claude/ directories. Writes `install.manifest` tracking all installed files and `setup.yaml` with install metadata (scope, mode, source, timestamp, manifest). Updates `settings.json` with hook entries via jq. Uninstall reads manifest for clean removal. Both handle migration from the old commands+skills layout.
+Interactive scripts (no CLI args). Install supports link (symlink) or copy mode. Data (hooks, logs, schema, config) goes to `.promptforge/`; skills go to `.claude/skills/`; hook entries are registered in `.claude/settings.json`. Writes `install.manifest` and `setup.yaml` with install metadata. For project installs in git repos, offers to add `.promptforge/` to `.gitignore` (warns about log data exposure if skipped). Uninstall reads manifest for clean removal. Both handle migration from the old `.claude/promptforge/` layout.
 
 Installed layout:
 ```
+<target>/.promptforge/
+  hooks/                 ← hook scripts
+  logs/                  ← JSONL log files
+  schema.json
+  setup.yaml             ← install metadata (scope, mode, source, manifest)
+  install.manifest
 <target>/.claude/
-  promptforge/hooks/     ← hook scripts
-  promptforge/logs/      ← JSONL log files
-  promptforge/schema.json
-  promptforge/setup.yaml ← install metadata (scope, mode, source, manifest)
-  promptforge/install.manifest
   skills/promptforge/    ← unified skill directory (SKILL.md, workflows/, scripts/)
+  settings.json          ← hook entries registered here
 ```
 
 ### Scope Selection
@@ -96,7 +98,7 @@ For **global installs** (`scope: global` in `setup.yaml`), all workflows ask the
 - **Project scope**: filters log entries by `project_dir` via `--project-filter`, targets project-local config
 - **Global scope**: analyzes all log entries, targets `~/.claude/` config files
 
-For **project-local installs**, project scope is used automatically. The scope preamble (`skills/promptforge/scope-preamble.md`) is read before each workflow — it reads `setup.yaml` via the Read tool (no Bash needed) and sets scope variables (`SCOPE_PROJECT_FILTER`, `SCOPE_TARGET_DIR`, `SCOPE_FRICTION_REPORT`, `SCOPE_LABEL`).
+For **project-local installs**, project scope is used automatically. The scope preamble (`skills/promptforge/scope-preamble.md`) is read before each workflow — it reads `~/.promptforge/setup.yaml` via the Read tool (no Bash needed) and sets scope variables (`SCOPE_PROJECT_FILTER`, `SCOPE_TARGET_DIR`, `SCOPE_FRICTION_REPORT`, `SCOPE_LABEL`).
 
 ## Development Conventions
 

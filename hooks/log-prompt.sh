@@ -7,13 +7,13 @@ set -e
 resolve_log_dir() {
   local project_dir
   project_dir=$(echo "$INPUT" | jq -r '.workspace.project_dir // empty')
-  if [ -n "$project_dir" ] && [ -d "$project_dir/.claude/promptforge/logs" ]; then
-    echo "$project_dir/.claude/promptforge/logs"
-  elif [ -d "$HOME/.claude/promptforge/logs" ]; then
-    echo "$HOME/.claude/promptforge/logs"
+  if [ -n "$project_dir" ] && [ -d "$project_dir/.promptforge/logs" ]; then
+    echo "$project_dir/.promptforge/logs"
+  elif [ -d "$HOME/.promptforge/logs" ]; then
+    echo "$HOME/.promptforge/logs"
   else
-    mkdir -p "$HOME/.claude/promptforge/logs"
-    echo "$HOME/.claude/promptforge/logs"
+    mkdir -p "$HOME/.promptforge/logs"
+    echo "$HOME/.promptforge/logs"
   fi
 }
 
