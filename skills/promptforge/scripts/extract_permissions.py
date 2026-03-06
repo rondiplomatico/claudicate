@@ -239,6 +239,60 @@ def find_generalizable(patterns, threshold=3):
     return generalizable
 
 
+def collect_usage_for_patterns(patterns, log_entries):
+    """For each wildcard pattern, collect actual commands from logs that match it.
+
+    Returns a dict mapping pattern raw string to {source, subcommands: Counter}.
+    Used by the LLM to evaluate whether broad patterns can be tightened.
+    """
+    # Collect all Bash tool_use commands from logs
+    bash_commands = []
+    for e in log_entries:
+        if e.get("event_type") == "tool_use" and e.get("tool_name") == "Bash":
+            cmd = extract_bash_command(e.get("tool_input", {}))
+            if cmd:
+                bash_commands.append(cmd)
+
+    usage_map = {}
+    for p in patterns:
+        if p.get("malformed") or p["tool"] != "Bash" or not p["has_wildcard"]:
+            continue
+
+        prefix = p["prefix"]
+        matched = [cmd for cmd in bash_commands
+                   if cmd == prefix or cmd.startswith(prefix + " ")]
+        if not matched:
+            usage_map[p["raw"]] = {
+                "source": p.get("source", ""),
+                "matched_count": 0,
+                "subcommands": [],
+            }
+            continue
+
+        # Extract subcommand patterns from actual usage
+        subcommand_counts = Counter()
+        for cmd in matched:
+            words = cmd.split()
+            if len(words) >= 3 and words[1] == "-m":
+                # python3 -m <module> pattern
+                subcommand_counts[f"{words[0]} -m {words[2]}"] += 1
+            elif len(words) >= 2:
+                subcommand_counts[f"{words[0]} {words[1]}"] += 1
+            else:
+                subcommand_counts[words[0]] += 1
+
+        usage_map[p["raw"]] = {
+            "source": p.get("source", ""),
+            "matched_count": len(matched),
+            "subcommands": [
+                {"prefix": sub, "count": cnt}
+                for sub, cnt in subcommand_counts.most_common()
+            ],
+        }
+
+    return usage_map
+
+
 def matches_pattern(parsed_pattern, tool_name, command_str):
     """Check if a tool invocation matches a parsed permission pattern."""
     if parsed_pattern.get("malformed"):
@@ -423,6 +477,9 @@ def main():
 
     candidates = analyze_log_candidates(entries, all_patterns, args.denial_threshold)
 
+    # Collect actual usage data for wildcard patterns (for LLM tightening analysis)
+    usage_data = collect_usage_for_patterns(all_patterns, entries)
+
     # Compute summary
     removable = len(duplicates) + len(redundancies) + len(anomalies)
     generalizable_entries = sum(g["entry_count"] for g in generalizable)
@@ -442,6 +499,7 @@ def main():
             "anomalies": anomalies,
             "generalizable": generalizable,
             "new_candidates": candidates,
+            "wildcard_usage": usage_data,
         },
         "summary": {
             "duplicates": len(duplicates),

@@ -85,8 +85,9 @@ Analyzes permission patterns across both `settings.json` (shared/versioned) and 
 - **Anomalies**: malformed entries (bash comments, broken syntax)
 - **Consolidation**: groups of one-off exact commands that can be replaced by a single wildcard pattern
 - **New candidates**: frequently denied/used tools from logs that should be added to the allow list
+- **Tightening**: overly broad wildcard patterns (e.g., `Bash(python3:*)`) evaluated against actual usage from logs, with narrower replacements proposed (e.g., `Bash(python3 -m pytest:*)`)
 
-Scope-aware: in project scope, also detects cross-scope redundancies (project entries already covered by global settings). Changes are written back to the correct file (machine-specific patterns to `settings.local.json`, general patterns to `settings.json`).
+Scope-aware: in project scope, also reads global settings (which apply to the project) and detects cross-scope redundancies. Changes are written back to the correct file (machine-specific patterns to `settings.local.json`, general patterns to `settings.json`).
 
 ```bash
 # Or run the analysis script directly:
