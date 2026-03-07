@@ -78,7 +78,7 @@ Two workflow chains:
 - **Permission optimization**: `improve-permissions` (analyzes settings.json for redundancies, consolidation, and new candidates from tool usage/denial logs; scope-aware with cross-scope redundancy detection)
 
 ### Installation (`install.sh`, `uninstall.sh`)
-Interactive scripts (no CLI args). Install supports link (symlink) or copy mode. Data (hooks, logs, schema, config) goes to `.promptforge/`; skills go to `.claude/skills/`; hook entries are registered in `.claude/settings.local.json` (local, not committed — hooks use absolute paths and write to local `.promptforge/`). Writes `install.manifest` and `setup.yaml` with install metadata. For project installs in git repos, offers to add `.promptforge/` to `.gitignore` (warns about log data exposure if skipped). Uninstall reads manifest for clean removal.
+Interactive scripts (no CLI args). Install supports link (symlink) or copy mode. Data (hooks, logs, schema, config) goes to `.promptforge/`; skills go to `.claude/skills/`. Hook entries are registered in the appropriate settings file: **global installs** use `.claude/settings.json` (Claude Code doesn't support `settings.local.json` at the global `~/.claude/` level), **project installs** use `.claude/settings.local.json` (local, not committed — hooks use absolute paths and write to local `.promptforge/`). Writes `install.manifest` and `setup.yaml` with install metadata. For project installs in git repos, offers to add `.promptforge/` to `.gitignore` (warns about log data exposure if skipped). Uninstall reads manifest for clean removal.
 
 Installed layout:
 ```
@@ -90,7 +90,8 @@ Installed layout:
   install.manifest
 <target>/.claude/
   skills/promptforge/    ← unified skill directory (SKILL.md, workflows/, scripts/)
-  settings.local.json    ← hook entries registered here (local, not committed)
+  settings.json          ← hook entries (global installs)
+  settings.local.json    ← hook entries (project installs, not committed)
 ```
 
 ### Scope Selection

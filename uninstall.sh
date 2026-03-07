@@ -100,11 +100,16 @@ done < "$MANIFEST"
 echo "  $REMOVED removed, $MISSING already missing"
 echo ""
 
-# --- [4] Remove hook entries from settings.local.json ---
-SETTINGS_FILE="$TARGET_CLAUDE_DIR/settings.local.json"
+# --- [4] Remove hook entries from settings ---
+# Global installs use settings.json; project installs use settings.local.json.
+if [ "$TARGET_CHOICE" = "g" ]; then
+  SETTINGS_FILE="$TARGET_CLAUDE_DIR/settings.json"
+else
+  SETTINGS_FILE="$TARGET_CLAUDE_DIR/settings.local.json"
+fi
 
 if [ -f "$SETTINGS_FILE" ]; then
-  echo "[4] Cleaning settings.local.json..."
+  echo "[4] Cleaning $(basename "$SETTINGS_FILE")..."
   BEFORE=$(jq '.hooks // [] | length' "$SETTINGS_FILE")
   UPDATED=$(jq '
     .hooks = ((.hooks // []) | map(select(.command | tostring | contains("promptforge") | not)))

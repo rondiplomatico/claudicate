@@ -172,12 +172,16 @@ esac
 } > "$TARGET_PF_DIR/setup.yaml"
 echo "  Written  $TARGET_PF_DIR/setup.yaml"
 
-# --- Update settings.local.json with hook entries ---
-# Hooks use absolute paths and write to local .promptforge/ — they belong in
-# the local (non-committed) settings file, not the shared settings.json.
-SETTINGS_FILE="$TARGET_CLAUDE_DIR/settings.local.json"
+# --- Update settings with hook entries ---
+# Global installs use settings.json (settings.local.json is not supported at ~/.claude/).
+# Project installs use settings.local.json (non-committed, machine-specific paths).
+if [ "$SCOPE" = "global" ]; then
+  SETTINGS_FILE="$TARGET_CLAUDE_DIR/settings.json"
+else
+  SETTINGS_FILE="$TARGET_CLAUDE_DIR/settings.local.json"
+fi
 
-# Ensure settings.local.json exists
+# Ensure settings file exists
 if [ ! -f "$SETTINGS_FILE" ]; then
   echo '{}' > "$SETTINGS_FILE"
 fi

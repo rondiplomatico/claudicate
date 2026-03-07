@@ -13,7 +13,7 @@ Agent sessions (from Claude Code sub-agents) are automatically detected and tagg
 ./uninstall.sh  # interactive: manifest-based removal with user-file detection
 ```
 
-Both scripts prompt for the target: global (`~/.promptforge/` + `~/.claude/`), a project path, or the current directory. Data (hooks, logs, schema, config) goes to `.promptforge/`; skills go to `.claude/skills/`; hook entries are registered in `.claude/settings.local.json` (local, not committed — hooks use absolute paths). Install supports **symlink** mode (auto-updates on `git pull`) or **copy** mode. Run install multiple times for different targets.
+Both scripts prompt for the target: global (`~/.promptforge/` + `~/.claude/`), a project path, or the current directory. Data (hooks, logs, schema, config) goes to `.promptforge/`; skills go to `.claude/skills/`. Hook entries are registered in the appropriate settings file: **global installs** use `.claude/settings.json` (Claude Code doesn't support `settings.local.json` at `~/.claude/`), **project installs** use `.claude/settings.local.json` (local, not committed — hooks use absolute paths). Install supports **symlink** mode (auto-updates on `git pull`) or **copy** mode. Run install multiple times for different targets.
 
 The installer writes an `install.manifest` and a `setup.yaml` (scope, mode, source, manifest metadata) to `.promptforge/`, used by the skill and the uninstaller. For project installs in git repos, the installer offers to add `.promptforge/` to `.gitignore` (with a clear warning if skipped — logs contain session prompts, tool arguments, and timestamps that shouldn't be committed). Uninstall also checks for user-added files and optionally preserves log data.
 
