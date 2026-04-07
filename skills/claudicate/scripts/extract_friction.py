@@ -215,8 +215,8 @@ def main():
     parser.add_argument("--project-filter", help="Only include entries matching this project directory")
     parser.add_argument("--output", default="/tmp/claudicate-friction-data.json",
                         help="Output JSON file")
-    parser.add_argument("--include-agents", action="store_true",
-                        help="Include agent sessions (excluded by default)")
+    parser.add_argument("--exclude-agents", action="store_true",
+                        help="Exclude agent sessions from analysis (included by default)")
     args = parser.parse_args()
 
     # Load logs from all sources
@@ -229,8 +229,8 @@ def main():
         entries = [e for e in entries
                    if os.path.normpath(e.get('project_dir', '')).replace('\\', '/') == filter_path]
 
-    # Filter agent sessions unless --include-agents
-    if not args.include_agents:
+    # Filter agent sessions if --exclude-agents
+    if args.exclude_agents:
         total_before = len(entries)
         entries = [e for e in entries
                    if not (e.get('session_id', '').startswith('agent-')

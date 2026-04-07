@@ -49,9 +49,9 @@ Utility scripts in `scripts/`:
 - `validate-logs.py` — validates JSONL against schema
 
 Analysis scripts co-located in `skills/claudicate/scripts/`:
-- `analyze_usage.py` — generates usage report (volume, time patterns, token usage, tags); excludes agent sessions by default (`--include-agents` to include)
+- `analyze_usage.py` — generates usage report (volume, time patterns, token usage, tags); includes agent sessions by default (`--exclude-agents` to omit); adds TOKEN BREAKDOWN section with user vs agent token split and top session groups (parent + correlated sub-agents by time-based heuristic)
 - `analyze_agents.py` — agent-specific analysis (overview, prompt characteristics, friction, parent-child session correlation, complexity)
-- `extract_friction.py` — pre-aggregates friction signals (denials, negations, contradictions, repeated clarifications) into JSON; excludes agent sessions by default (`--include-agents` to include)
+- `extract_friction.py` — pre-aggregates friction signals (denials, negations, contradictions, repeated clarifications) into JSON; includes agent sessions by default (`--exclude-agents` to omit)
 - `extract_permissions.py` — analyzes permissions across `settings.json` (shared) and `settings.local.json` (personal) for redundancies, anomalies, generalization opportunities, new candidates from tool usage/denial logs, and actual usage breakdown per wildcard pattern (for LLM-driven tightening analysis); tracks which file each entry comes from
 
 All analysis scripts support `--logs-dir` (repeatable), `--since`, auto-discover log directories, and `--project-filter DIR` to restrict analysis to entries from a specific project. Path comparison in `--project-filter` normalizes backslashes to forward slashes for Windows compatibility.

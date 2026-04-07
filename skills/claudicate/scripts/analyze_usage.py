@@ -66,6 +66,37 @@ def section(title, fmt="text"):
     return f"\n{'=' * 60}\n{title}\n{'=' * 60}"
 
 
+def group_sessions_by_parent(records):
+    """
+    Time-based heuristic: for each agent session, find the user session whose
+    most recent event preceded the agent session's first event.
+    Returns dict: parent_sid -> [agent_sid, ...]
+    """
+    user_events = sorted(
+        [(r['_dt'], r.get('session_id', ''))
+         for r in records if not r.get('session_id', '').startswith('agent-')],
+        key=lambda x: x[0]
+    )
+    agent_by_sid = defaultdict(list)
+    for r in records:
+        sid = r.get('session_id', '')
+        if sid.startswith('agent-'):
+            agent_by_sid[sid].append(r)
+
+    parent_map = defaultdict(list)
+    for agent_sid, events in agent_by_sid.items():
+        agent_start = min(e['_dt'] for e in events)
+        parent_sid = None
+        for dt, sid in reversed(user_events):
+            if dt < agent_start:
+                parent_sid = sid
+                break
+        if parent_sid:
+            parent_map[parent_sid].append(agent_sid)
+
+    return parent_map
+
+
 def main():
     parser = argparse.ArgumentParser(description="Analyze Claudicate interaction logs")
     parser.add_argument("--logs-dir", action="append", help="Log directory (can be repeated)")
@@ -73,8 +104,8 @@ def main():
     parser.add_argument("--project-filter", help="Only include entries matching this project directory")
     parser.add_argument("--format", choices=["text", "markdown"], default="text", help="Output format")
     parser.add_argument("--output", help="Write report to file instead of stdout")
-    parser.add_argument("--include-agents", action="store_true",
-                        help="Include agent sessions (excluded by default)")
+    parser.add_argument("--exclude-agents", action="store_true",
+                        help="Exclude agent sessions from analysis (included by default)")
     args = parser.parse_args()
 
     since_date = None
@@ -100,8 +131,8 @@ def main():
         records = [r for r in records
                    if os.path.normpath(r.get('project_dir', '')).replace('\\', '/') == filter_path]
 
-    # Filter agent sessions unless --include-agents
-    if not args.include_agents:
+    # Filter agent sessions if --exclude-agents
+    if args.exclude_agents:
         total_before = len(records)
         records = [r for r in records
                    if not (r.get('session_id', '').startswith('agent-')
@@ -128,7 +159,7 @@ def main():
     turn_ends = [r for r in records if r.get('event_type') == 'turn_end']
 
     if agent_excluded > 0:
-        p(f"*Agent sessions excluded: {agent_excluded} entries (use --include-agents to include)*\n")
+        p(f"*Agent sessions excluded: {agent_excluded} entries (remove --exclude-agents to include)*\n")
 
     # ============ VOLUME ============
     p(section("VOLUME", fmt))
@@ -300,31 +331,37 @@ def main():
         out_tok = [r['token_usage'].get('output_tokens', 0) for r in token_records]
         cache_read = [r['token_usage'].get('cache_read_input_tokens', 0) for r in token_records]
         cache_create = [r['token_usage'].get('cache_creation_input_tokens', 0) for r in token_records]
+        # Effective input = new tokens + cache reads + cache writes (total context processed)
+        effective_inp = [i + cr + cc for i, cr, cc in zip(inp, cache_read, cache_create)]
 
         total_inp = sum(inp)
         total_out = sum(out_tok)
-        total_cache = sum(cache_read)
+        total_cache_read = sum(cache_read)
+        total_cache_create = sum(cache_create)
+        total_effective = sum(effective_inp)
 
         if fmt == "markdown":
             p(f"| Metric | Value |")
             p(f"|--------|-------|")
             p(f"| Records with token data | {len(token_records)} |")
-            p(f"| Avg input tokens/turn | {total_inp/len(inp):,.0f} |")
+            p(f"| Avg effective input tokens/turn | {total_effective/len(effective_inp):,.0f} |")
             p(f"| Avg output tokens/turn | {total_out/len(out_tok):,.0f} |")
-            p(f"| Cache hit rate | {total_cache/total_inp*100:.1f}% |" if total_inp else "| Cache hit rate | N/A |")
-            p(f"| Total input tokens | {total_inp:,} |")
+            p(f"| Cache hit rate | {total_cache_read/total_effective*100:.1f}% |" if total_effective else "| Cache hit rate | N/A |")
+            p(f"| Total effective input tokens | {total_effective:,} |")
             p(f"| Total output tokens | {total_out:,} |")
-            p(f"| Total cache read | {total_cache:,} |")
-            p(f"| Total cache creation | {sum(cache_create):,} |")
+            p(f"| Total cache read tokens | {total_cache_read:,} |")
+            p(f"| Total cache creation tokens | {total_cache_create:,} |")
+            p(f"| Total new (non-cached) input tokens | {total_inp:,} |")
         else:
             p(f"Records with token data: {len(token_records)}")
-            p(f"Avg input tokens/turn: {total_inp/len(inp):,.0f}")
+            p(f"Avg effective input tokens/turn: {total_effective/len(effective_inp):,.0f}")
             p(f"Avg output tokens/turn: {total_out/len(out_tok):,.0f}")
-            p(f"Cache hit rate: {total_cache/total_inp*100:.1f}%" if total_inp else "Cache hit rate: N/A")
-            p(f"Total input tokens: {total_inp:,}")
+            p(f"Cache hit rate: {total_cache_read/total_effective*100:.1f}%" if total_effective else "Cache hit rate: N/A")
+            p(f"Total effective input tokens: {total_effective:,}")
             p(f"Total output tokens: {total_out:,}")
-            p(f"Total cache read: {total_cache:,}")
-            p(f"Total cache creation: {sum(cache_create):,}")
+            p(f"Total cache read tokens: {total_cache_read:,}")
+            p(f"Total cache creation tokens: {total_cache_create:,}")
+            p(f"Total new (non-cached) input tokens: {total_inp:,}")
     else:
         p("No token usage data available in logs.")
 
@@ -399,6 +436,77 @@ def main():
         else:
             for model, count in models.most_common():
                 p(f"  {model:40s}: {count:5d}")
+
+    # ============ TOKEN BREAKDOWN: USER VS AGENT ============
+    if not args.exclude_agents and token_records:
+        agent_token_records = [r for r in token_records
+                               if r.get('session_id', '').startswith('agent-')]
+        user_token_records = [r for r in token_records
+                              if not r.get('session_id', '').startswith('agent-')]
+        if agent_token_records:
+            p(section("TOKEN BREAKDOWN: USER vs AGENT SESSIONS", fmt))
+
+            def sum_eff(recs):
+                return sum(
+                    r['token_usage'].get('input_tokens', 0)
+                    + r['token_usage'].get('cache_read_input_tokens', 0)
+                    + r['token_usage'].get('cache_creation_input_tokens', 0)
+                    for r in recs
+                )
+
+            def sum_out(recs):
+                return sum(r['token_usage'].get('output_tokens', 0) for r in recs)
+
+            u_eff, u_out = sum_eff(user_token_records), sum_out(user_token_records)
+            a_eff, a_out = sum_eff(agent_token_records), sum_out(agent_token_records)
+            g_eff, g_out = u_eff + a_eff, u_out + a_out
+            pct_u = u_eff / g_eff * 100 if g_eff else 0
+            pct_a = a_eff / g_eff * 100 if g_eff else 0
+
+            if fmt == "markdown":
+                p("| | User Sessions | Agent Sessions | Total |")
+                p("|--|:---:|:---:|:---:|")
+                p(f"| Turns w/ token data | {len(user_token_records)} | {len(agent_token_records)} | {len(token_records)} |")
+                p(f"| Effective input tokens | {u_eff:,} ({pct_u:.0f}%) | {a_eff:,} ({pct_a:.0f}%) | {g_eff:,} |")
+                p(f"| Output tokens | {u_out:,} | {a_out:,} | {g_out:,} |")
+            else:
+                p(f"{'':35s} {'User':>14} {'Agent':>14} {'Total':>12}")
+                p(f"{'Turns w/ token data':35s} {len(user_token_records):>14,} {len(agent_token_records):>14,} {len(token_records):>12,}")
+                p(f"{'Effective input tokens':35s} {u_eff:>10,}{pct_u:4.0f}% {a_eff:>10,}{pct_a:4.0f}% {g_eff:>12,}")
+                p(f"{'Output tokens':35s} {u_out:>14,} {a_out:>14,} {g_out:>12,}")
+
+            # Session group breakdown
+            parent_map = group_sessions_by_parent(records)
+            if parent_map:
+                tokens_by_sid = defaultdict(lambda: [0, 0])  # [eff, out]
+                for r in token_records:
+                    sid = r.get('session_id', '')
+                    usage = r['token_usage']
+                    e = (usage.get('input_tokens', 0)
+                         + usage.get('cache_read_input_tokens', 0)
+                         + usage.get('cache_creation_input_tokens', 0))
+                    tokens_by_sid[sid][0] += e
+                    tokens_by_sid[sid][1] += usage.get('output_tokens', 0)
+
+                groups = []
+                for psid, children in parent_map.items():
+                    pe, po = tokens_by_sid[psid]
+                    ce = sum(tokens_by_sid[c][0] for c in children)
+                    co = sum(tokens_by_sid[c][1] for c in children)
+                    groups.append((psid, len(children), pe, ce, pe + ce, po + co))
+                groups.sort(key=lambda x: -x[4])
+
+                if fmt == "markdown":
+                    p(f"\n### Top session groups by total effective input tokens\n")
+                    p("| Parent Session | Sub-agents | Parent | Agent | Group Total |")
+                    p("|----------------|:----------:|-------:|------:|------------:|")
+                    for psid, n, pe, ce, total, _ in groups[:15]:
+                        p(f"| `{psid[:16]}` | {n} | {pe:,} | {ce:,} | {total:,} |")
+                else:
+                    p(f"\nTop session groups by total effective input tokens:")
+                    p(f"  {'Parent Session':>20}  {'Agents':>6}  {'Parent':>10}  {'Agent':>10}  {'Group Total':>12}")
+                    for psid, n, pe, ce, total, _ in groups[:15]:
+                        p(f"  {psid[:20]:>20}  {n:>6}  {pe:>10,}  {ce:>10,}  {total:>12,}")
 
     # Output
     report = "\n".join(out)
