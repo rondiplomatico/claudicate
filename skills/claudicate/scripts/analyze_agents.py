@@ -130,7 +130,9 @@ def main():
     if args.project_filter:
         filter_path = os.path.normpath(args.project_filter).replace('\\', '/')
         records = [r for r in records
-                   if os.path.normpath(r.get('project_dir', '')).replace('\\', '/') == filter_path]
+                   if os.path.normpath(
+                       r.get('project_dir', '') or r.get('cwd', '')
+                   ).replace('\\', '/') == filter_path]
 
     if not records:
         print("No log entries found.")

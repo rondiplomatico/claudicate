@@ -54,7 +54,7 @@ Analysis scripts co-located in `skills/claudicate/scripts/`:
 - `extract_friction.py` — pre-aggregates friction signals (denials, negations, contradictions, repeated clarifications) into JSON; includes agent sessions by default (`--exclude-agents` to omit)
 - `extract_permissions.py` — analyzes permissions across `settings.json` (shared) and `settings.local.json` (personal) for redundancies, anomalies, generalization opportunities, new candidates from tool usage/denial logs, and actual usage breakdown per wildcard pattern (for LLM-driven tightening analysis); tracks which file each entry comes from
 
-All analysis scripts support `--logs-dir` (repeatable), `--since`, auto-discover log directories, and `--project-filter DIR` to restrict analysis to entries from a specific project. Path comparison in `--project-filter` normalizes backslashes to forward slashes for Windows compatibility.
+All analysis scripts support `--logs-dir` (repeatable), `--since`, auto-discover log directories, and `--project-filter DIR` to restrict analysis to entries from a specific project. Path comparison in `--project-filter` normalizes backslashes to forward slashes for Windows compatibility, and falls back to the `cwd` field when `project_dir` is empty (which happens when `workspace.project_dir` is not set by Claude Code for a given session).
 
 ### Unified Skill (`skills/claudicate/`)
 A single skill directory provides all claudicate workflows via `/claudicate <workflow>`. The `SKILL.md` router accepts arguments (`$0`) to dispatch to workflow files, or presents an interactive menu if no argument is given.

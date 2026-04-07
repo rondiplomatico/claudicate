@@ -129,7 +129,9 @@ def main():
     if args.project_filter:
         filter_path = os.path.normpath(args.project_filter).replace('\\', '/')
         records = [r for r in records
-                   if os.path.normpath(r.get('project_dir', '')).replace('\\', '/') == filter_path]
+                   if os.path.normpath(
+                       r.get('project_dir', '') or r.get('cwd', '')
+                   ).replace('\\', '/') == filter_path]
 
     # Filter agent sessions if --exclude-agents
     if args.exclude_agents:
@@ -400,7 +402,7 @@ def main():
 
     # ============ PROJECT DISTRIBUTION ============
     p(section("PROJECT DISTRIBUTION", fmt))
-    projects = Counter(r.get('project_dir', 'unknown') for r in records)
+    projects = Counter(r.get('project_dir', '') or r.get('cwd', '') or 'unknown' for r in records)
     if fmt == "markdown":
         p(f"| Count | Project |")
         p(f"|-------|---------|")
