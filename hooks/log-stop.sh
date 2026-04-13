@@ -24,23 +24,21 @@ extract_token_usage() {
     echo "null"
     return
   fi
-  # Find last assistant message with usage data
-  local usage
-  usage=$(tac "$transcript_path" 2>/dev/null | while IFS= read -r line; do
-    if echo "$line" | jq -e 'select(.type == "assistant") | .message.usage' 2>/dev/null; then
-      break
-    fi
-  done)
-  if [ -n "$usage" ]; then
-    echo "$usage" | jq -c '{
-      input_tokens: .input_tokens,
-      output_tokens: .output_tokens,
-      cache_read_input_tokens: .cache_read_input_tokens,
-      cache_creation_input_tokens: .cache_creation_input_tokens
-    }' 2>/dev/null || echo "null"
-  else
-    echo "null"
-  fi
+  # Sum usage across ALL assistant messages in the transcript.
+  # Each tool-call roundtrip is a separate API call; summing gives accurate totals.
+  # Uses -R (raw input) + try fromjson to tolerate any malformed lines.
+  jq -Rsc '
+    [split("\n")[] | select(length > 0) | try fromjson |
+     select(.type == "assistant" and .message.usage != null) | .message.usage] |
+    if length == 0 then null
+    else {
+      input_tokens:                (map(.input_tokens                // 0) | add),
+      output_tokens:               (map(.output_tokens               // 0) | add),
+      cache_read_input_tokens:     (map(.cache_read_input_tokens     // 0) | add),
+      cache_creation_input_tokens: (map(.cache_creation_input_tokens // 0) | add)
+    }
+    end
+  ' "$transcript_path" 2>/dev/null || echo "null"
 }
 
 # --- Main ---

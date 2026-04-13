@@ -27,6 +27,9 @@ auto_tag() {
     tags+=("bmad" "bmad:${BASH_REMATCH[1]}")
   elif [[ "$prompt" =~ ^/BMad:tasks:([a-zA-Z_-]+) ]]; then
     tags+=("bmad" "bmad_task:${BASH_REMATCH[1]}")
+  elif [[ "$(printf '%s' "$prompt" | tr '[:upper:]' '[:lower:]')" =~ (^|[/>])bmad[-_:] ]]; then
+    # Catch skill invocations: /bmad-quick-dev, <command-message>bmad-..., etc.
+    tags+=("bmad")
   fi
 
   # Slash command

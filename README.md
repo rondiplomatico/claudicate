@@ -14,7 +14,7 @@ Your workflow is limping. You just haven't measured the gait yet. Claudicate hoo
 
 A self-improvement toolkit for Claude Code. Captures user interactions (prompts, clarification answers, tool denials, tool uses, turn metadata) as structured JSONL, then analyzes friction patterns and suggests improvements to your project configuration, permissions, and BMAD setup.
 
-Agent sessions (from Claude Code sub-agents) are automatically detected and tagged. Analysis scripts exclude agent noise by default (`--include-agents` to opt in), and dedicated agent analysis tools let you inspect and improve agent behavior separately.
+Agent sessions (from Claude Code sub-agents) are automatically detected and tagged. Analysis scripts include agent sessions by default (`--exclude-agents` to omit), and dedicated agent analysis tools let you inspect and improve agent behavior separately. Token costs are correlated across parent and sub-agent sessions for accurate session group totals.
 
 ## Install / Uninstall
 
@@ -64,7 +64,7 @@ python3 skills/claudicate/scripts/analyze_usage.py --project-filter /path/to/pro
 
 Finds the patterns you'd rather not see. Detects repeated clarifications, tool denials, negation language, contradictions, and correction chains. Writes a Friction Report to the scope-appropriate location (project: `<project>/.claudicate/friction-report.md`, global: `~/.claudicate/friction-report.md`).
 
-Uses `skills/claudicate/scripts/extract_friction.py` to pre-aggregate signals, reducing context load for analysis. Agent sessions are excluded by default.
+Uses `skills/claudicate/scripts/extract_friction.py` to pre-aggregate signals, reducing context load for analysis. Agent sessions are included by default (`--exclude-agents` to omit).
 
 ### `/claudicate prescribe` — Project Config Improvements
 

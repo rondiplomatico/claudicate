@@ -33,7 +33,7 @@ Bash scripts triggered by Claude Code events. All share a common pattern:
 
 PostToolUse hooks receive data in `tool_input` / `tool_response` fields (not `inputs` / `response`).
 
-`log-prompt.sh` applies auto-tags via regex (bmad, slash_command, planning, testing, git_ops, compaction, etc.). `log-tool-denial.sh` filters to only user interrupts and explicit denials. `log-tool-use.sh` filters to only Bash, Write, and Edit tools (Read/Glob/Grep/Agent are too noisy and not permission-relevant); tool_input is stored as a string (truncated to 500 chars) to avoid broken JSON from mid-truncation. `log-ask-response.sh` handles both single-question (`tool_input.question`) and multi-question (`tool_input.questions[]`) AskUserQuestion formats. All hooks detect agent sessions (session_id starting with `agent-`) and add the `agent` tag automatically.
+`log-prompt.sh` applies auto-tags via regex (bmad, slash_command, planning, testing, git_ops, compaction, etc.). BMAD detection covers `/BMad:agents:X`, `/BMad:tasks:X`, and skill invocations where the prompt starts with or contains `bmad-`/`bmad_`/`bmad:` after `/` or `>` (e.g. `<command-message>bmad-quick-dev...` from expanded slash commands), matched case-insensitively. `log-tool-denial.sh` filters to only user interrupts and explicit denials. `log-tool-use.sh` filters to only Bash, Write, and Edit tools (Read/Glob/Grep/Agent are too noisy and not permission-relevant); tool_input is stored as a string (truncated to 500 chars) to avoid broken JSON from mid-truncation. `log-ask-response.sh` handles both single-question (`tool_input.question`) and multi-question (`tool_input.questions[]`) AskUserQuestion formats. All hooks detect agent sessions (session_id starting with `agent-`) and add the `agent` tag automatically.
 
 Hook entries in settings files use Claude Code's nested object format:
 ```json
@@ -49,12 +49,12 @@ Utility scripts in `scripts/`:
 - `validate-logs.py` — validates JSONL against schema
 
 Analysis scripts co-located in `skills/claudicate/scripts/`:
-- `analyze_usage.py` — generates usage report (volume, time patterns, token usage, tags); excludes agent sessions by default (`--include-agents` to include)
+- `analyze_usage.py` — generates usage report (volume, time patterns, token usage, tags); includes agent sessions by default (`--exclude-agents` to omit); adds TOKEN BREAKDOWN section with user vs agent token split and top session groups (parent + correlated sub-agents by time-based heuristic)
 - `analyze_agents.py` — agent-specific analysis (overview, prompt characteristics, friction, parent-child session correlation, complexity)
-- `extract_friction.py` — pre-aggregates friction signals (denials, negations, contradictions, repeated clarifications) into JSON; excludes agent sessions by default (`--include-agents` to include)
+- `extract_friction.py` — pre-aggregates friction signals (denials, negations, contradictions, repeated clarifications) into JSON; includes agent sessions by default (`--exclude-agents` to omit)
 - `extract_permissions.py` — analyzes permissions across `settings.json` (shared) and `settings.local.json` (personal) for redundancies, anomalies, generalization opportunities, new candidates from tool usage/denial logs, and actual usage breakdown per wildcard pattern (for LLM-driven tightening analysis); tracks which file each entry comes from
 
-All analysis scripts support `--logs-dir` (repeatable), `--since`, auto-discover log directories, and `--project-filter DIR` to restrict analysis to entries from a specific project. Path comparison in `--project-filter` normalizes backslashes to forward slashes for Windows compatibility.
+All analysis scripts support `--logs-dir` (repeatable), `--since`, auto-discover log directories, and `--project-filter DIR` to restrict analysis to entries from a specific project. Path comparison in `--project-filter` normalizes backslashes to forward slashes for Windows compatibility, and falls back to the `cwd` field when `project_dir` is empty (which happens when `workspace.project_dir` is not set by Claude Code for a given session).
 
 ### Unified Skill (`skills/claudicate/`)
 A single skill directory provides all claudicate workflows via `/claudicate <workflow>`. The `SKILL.md` router accepts arguments (`$0`) to dispatch to workflow files, or presents an interactive menu if no argument is given.
