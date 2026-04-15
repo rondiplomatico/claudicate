@@ -2,7 +2,7 @@
 
 ![Claudicate](claudicate_banner.png)
 
-[![Version](https://img.shields.io/badge/version-1.0.2-blue)](https://github.com/rondiplomatico/claudicate)
+[![Version](https://img.shields.io/badge/version-1.0.3-blue)](https://github.com/rondiplomatico/claudicate)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Shell](https://img.shields.io/badge/shell-bash-89e051)](https://www.gnu.org/software/bash/)
 [![Python](https://img.shields.io/badge/python-3.6%2B-3776ab)](https://www.python.org/)

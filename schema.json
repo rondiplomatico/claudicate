@@ -21,7 +21,7 @@
     },
     "project_dir": {
       "type": "string",
-      "description": "Project root directory (from workspace.project_dir)"
+      "description": "Project root directory (from workspace.project_dir or git root of cwd)"
     },
     "cwd": {
       "type": "string",

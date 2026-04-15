@@ -467,8 +467,15 @@ def main():
 
     if args.project_filter:
         filter_path = os.path.normpath(args.project_filter).replace('\\', '/')
-        entries = [e for e in entries
-                   if os.path.normpath(e.get('project_dir', '')).replace('\\', '/') == filter_path]
+
+        def matches_project(entry):
+            pd = os.path.normpath(entry.get('project_dir', '')).replace('\\', '/')
+            if pd == filter_path:
+                return True
+            cwd = os.path.normpath(entry.get('cwd', '')).replace('\\', '/')
+            return cwd == filter_path or cwd.startswith(filter_path + '/')
+
+        entries = [e for e in entries if matches_project(e)]
 
     # Combine primary + context patterns for coverage check
     all_patterns = patterns[:]

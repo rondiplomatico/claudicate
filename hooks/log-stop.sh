@@ -3,10 +3,26 @@
 # Captures turn-end metadata including model and best-effort token usage
 set -e
 
+# --- Resolve project root directory ---
+resolve_project_dir() {
+  local pd cwd
+  pd=$(echo "$INPUT" | jq -r '.workspace.project_dir // empty' | sed 's|\\|/|g')
+  if [ -n "$pd" ]; then
+    echo "$pd"
+    return
+  fi
+  cwd=$(echo "$INPUT" | jq -r '.cwd // empty' | sed 's|\\|/|g')
+  if [ -n "$cwd" ]; then
+    local root
+    root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null | sed 's|\\|/|g') || true
+    echo "${root:-$cwd}"
+  fi
+}
+
 # --- Shared log directory resolution ---
 resolve_log_dir() {
   local project_dir
-  project_dir=$(echo "$INPUT" | jq -r '.workspace.project_dir // empty' | sed 's|\\|/|g')
+  project_dir=$(resolve_project_dir)
   if [ -n "$project_dir" ] && [ -d "$project_dir/.claudicate/logs" ]; then
     echo "$project_dir/.claudicate/logs"
   elif [ -d "$HOME/.claudicate/logs" ]; then
@@ -57,7 +73,7 @@ LOG_FILE="$LOG_DIR/$(date +%Y-%m-%d).jsonl"
 
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
-PROJECT_DIR=$(echo "$INPUT" | jq -r '.workspace.project_dir // empty' | sed 's|\\|/|g')
+PROJECT_DIR=$(resolve_project_dir)
 MODEL=$(echo "$INPUT" | jq -r '.model.id // .model // empty')
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
