@@ -17,28 +17,87 @@ resolve_log_dir() {
   fi
 }
 
-# --- Token usage extraction (best-effort) ---
+# --- Token usage extraction (best-effort, offset-tracked) ---
+#
+# WHY OFFSET TRACKING IS NEEDED:
+#
+# Claude Code's transcript file is cumulative — it contains ALL assistant
+# messages from every turn in the session. Each assistant message carries a
+# "usage" object with that single API call's token counts. A multi-turn
+# session with tool use can accumulate thousands of assistant messages.
+#
+# The Stop hook fires once per turn. Without tracking, we'd either:
+#   (a) Sum ALL messages in the transcript → astronomically inflated totals
+#       because turn N's Stop would re-count turns 1..N-1, and turn N+1
+#       would re-count turns 1..N, etc.
+#   (b) Take only the last message → miss output from intermediate tool-call
+#       roundtrips within the turn, and risk attributing a later turn's data
+#       to an earlier turn if the transcript was already updated.
+#
+# OFFSET APPROACH:
+#   1. Store the count of assistant messages already processed in a temp file
+#      per session: /tmp/claudicate-offset-<session_id>
+#   2. On each Stop event, collect all assistant messages with usage from the
+#      transcript and slice to only the NEW ones (index prev_count .. end).
+#   3. Output tokens: SUM across new messages (captures all tool-call
+#      roundtrip output within this turn).
+#   4. Context tokens (input, cache_read, cache_create): take the LAST new
+#      message's values (snapshot of context window size at turn end).
+#   5. Write the new total count back to the offset file.
+#
+# The offset file lives in /tmp/ and is cleaned on reboot — harmless if lost,
+# the next Stop event simply starts from offset 0 (slight overcount for that
+# one turn, then accurate again).
+
 extract_token_usage() {
   local transcript_path="$1"
+  local session_id="$2"
   if [ -z "$transcript_path" ] || [ ! -f "$transcript_path" ]; then
     echo "null"
     return
   fi
-  # Sum usage across ALL assistant messages in the transcript.
-  # Each tool-call roundtrip is a separate API call; summing gives accurate totals.
+
+  local offset_file="/tmp/claudicate-offset-${session_id}"
+  local prev_count=0
+  if [ -f "$offset_file" ]; then
+    prev_count=$(cat "$offset_file" 2>/dev/null || echo 0)
+  fi
+
+  # Extract all assistant usage objects, then slice to only new ones.
+  # Produces: { total_count, output_tokens (summed), context snapshot (last) }
   # Uses -R (raw input) + try fromjson to tolerate any malformed lines.
-  jq -Rsc '
+  local result
+  result=$(jq -Rsc --argjson offset "$prev_count" '
     [split("\n")[] | select(length > 0) | try fromjson |
      select(.type == "assistant" and .message.usage != null) | .message.usage] |
-    if length == 0 then null
+    . as $all |
+    ($all | length) as $total |
+    $all[$offset:] |
+    if length == 0 then { total_count: $total, usage: null }
     else {
-      input_tokens:                (map(.input_tokens                // 0) | add),
-      output_tokens:               (map(.output_tokens               // 0) | add),
-      cache_read_input_tokens:     (map(.cache_read_input_tokens     // 0) | add),
-      cache_creation_input_tokens: (map(.cache_creation_input_tokens // 0) | add)
+      total_count: $total,
+      usage: {
+        input_tokens:                last.input_tokens,
+        output_tokens:               (map(.output_tokens               // 0) | add),
+        cache_read_input_tokens:     last.cache_read_input_tokens,
+        cache_creation_input_tokens: last.cache_creation_input_tokens
+      }
     }
     end
-  ' "$transcript_path" 2>/dev/null || echo "null"
+  ' "$transcript_path" 2>/dev/null)
+
+  if [ -z "$result" ]; then
+    echo "null"
+    return
+  fi
+
+  # Update offset for next turn
+  local new_count
+  new_count=$(echo "$result" | jq -r '.total_count')
+  echo "$new_count" > "$offset_file"
+
+  # Return just the usage object (or null)
+  echo "$result" | jq -c '.usage'
 }
 
 # --- Main ---
@@ -60,7 +119,7 @@ MODEL=$(echo "$INPUT" | jq -r '.model.id // .model // empty')
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
-TOKEN_USAGE=$(extract_token_usage "$TRANSCRIPT_PATH")
+TOKEN_USAGE=$(extract_token_usage "$TRANSCRIPT_PATH" "$SESSION_ID")
 
 # Agent session detection (session_id format: agent-XXXXXXX)
 if [[ "$SESSION_ID" == agent-* ]]; then
