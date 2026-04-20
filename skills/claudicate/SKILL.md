@@ -16,6 +16,7 @@ Usage: `/claudicate <workflow>` or `/claudicate` to choose interactively.
 | `diagnose` | Scan logs for corrections, negations, tool denials, and friction patterns |
 | `gait` | Generate usage report (volume, time patterns, token usage, tags) |
 | `agent-xray` | Analyze agent/subagent session patterns and effectiveness |
+| `cohort` | Analyze a specific agent/skill group (BMAD, slash-commands, skills) or auto-detect groups |
 | `prescribe` | Suggest improvements to CLAUDE.md, permissions, and memory files |
 | `prescribe-bmad` | Suggest improvements to BMAD agent and task definitions |
 | `rehab` | Suggest improvements to agent behavior and configuration |

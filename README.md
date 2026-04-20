@@ -2,7 +2,7 @@
 
 ![Claudicate](claudicate_banner.png)
 
-[![Version](https://img.shields.io/badge/version-1.0.3-blue)](https://github.com/rondiplomatico/claudicate)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue)](https://github.com/rondiplomatico/claudicate)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Shell](https://img.shields.io/badge/shell-bash-89e051)](https://www.gnu.org/software/bash/)
 [![Python](https://img.shields.io/badge/python-3.6%2B-3776ab)](https://www.python.org/)
@@ -87,6 +87,24 @@ python3 skills/claudicate/scripts/analyze_agents.py --format markdown
 python3 skills/claudicate/scripts/analyze_agents.py --since 2026-02-01 --project-filter /path/to/project
 ```
 
+### `/claudicate cohort` — Agent/Skill Group Analysis
+
+Picks a slice and shows you what's actually happening inside it. Targeted mode analyzes one group (`/claudicate cohort bmad`, `/claudicate cohort bmad:dev`, `/claudicate cohort /analyze-evaluation`, `/claudicate cohort skill:claudicate`). Discovery mode (`/claudicate cohort` with no argument) scans the logs, surfaces candidate groups, and lets you pick one — or asks for the generic overview if you just want the landscape.
+
+Reports per cohort:
+- Direct invocations and per-member breakdown (e.g., `bmad:dev` vs `bmad:po`)
+- **Session-level adoption** — sessions containing ≥1 invocation and the total prompts inside those sessions (the realistic "how much of my work happens in this mode" figure; usually much larger than raw invocation count)
+- Session-length comparison vs non-cohort sessions
+- Member combinations per session (which members are used together)
+- Daily volume and friction (tool denials + negation language) inside cohort sessions
+- Agent-tool subagent fanout attributable to the cohort
+- **Declared vs Observed** — for BMAD families, auto-reads `.bmad-core/agents/` and flags unused roles; for skill families, reads `.claude/skills/`
+
+```bash
+python3 skills/claudicate/scripts/analyze_cohort.py --target bmad --format markdown
+python3 skills/claudicate/scripts/analyze_cohort.py --list --project-filter /path/to/project
+```
+
 ### `/claudicate rehab` — Agent Improvement Suggestions
 
 Uses agent analysis and friction data to suggest improvements to agent prompts, skill definitions, and CLAUDE.md agent instructions. Correlates agent friction back to the parent user intent that triggered it.
@@ -145,6 +163,11 @@ The loop that makes the limp visible:
 1. `/claudicate agent-xray` — understand agent usage patterns
 2. `/claudicate diagnose` — generate friction report (agents excluded by default)
 3. `/claudicate rehab` — get suggestions for agent prompt and skill improvements
+
+**Skillset analysis:**
+1. `/claudicate cohort` — discovery: find which agent/skill groups exist in your logs
+2. `/claudicate cohort <target>` — deep breakdown for one group (e.g., `bmad`, `/analyze-evaluation`)
+3. Feed findings into `/claudicate prescribe-bmad` or `/claudicate rehab` for concrete fixes
 
 ### Utility Scripts
 

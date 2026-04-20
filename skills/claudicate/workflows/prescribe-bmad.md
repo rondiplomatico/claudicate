@@ -8,6 +8,8 @@ Use claudicate friction analysis to suggest improvements to BMAD agents, tasks, 
 
 Run `/claudicate diagnose` first to generate a Friction Report. If no friction report exists at `$SCOPE_FRICTION_REPORT`, inform the user and run the analysis.
 
+**Tip**: Run `/claudicate cohort bmad` beforehand to get a structured breakdown of BMAD agent distribution, session-level adoption, and unused BMAD roles (auto-detected from `.bmad-core/agents/`). The cohort report is useful context when deciding which agent definitions are worth touching.
+
 ## Steps
 
 ### 1. Identify BMAD-related friction

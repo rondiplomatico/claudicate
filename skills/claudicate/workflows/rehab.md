@@ -10,6 +10,8 @@ Run these workflows first:
 
 If the friction report doesn't exist at `$SCOPE_FRICTION_REPORT`, inform the user and run the analysis.
 
+**Optional context**: Run `/claudicate cohort` (discovery) or `/claudicate cohort <target>` for a named group first if the agent/skill landscape is unclear — it surfaces which slash-commands and skills are actually driving subagent fanout, which makes the cross-referencing in step 4 sharper.
+
 ## Steps
 
 ### 1. Run agent analysis

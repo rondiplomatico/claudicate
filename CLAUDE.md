@@ -53,6 +53,7 @@ Analysis scripts co-located in `skills/claudicate/scripts/`:
 - `analyze_agents.py` — agent-specific analysis (overview, prompt characteristics, friction, parent-child session correlation, complexity)
 - `extract_friction.py` — pre-aggregates friction signals (denials, negations, contradictions, repeated clarifications) into JSON; excludes agent sessions by default (`--include-agents` to include)
 - `extract_permissions.py` — analyzes permissions across `settings.json` (shared) and `settings.local.json` (personal) for redundancies, anomalies, generalization opportunities, new candidates from tool usage/denial logs, and actual usage breakdown per wildcard pattern (for LLM-driven tightening analysis); tracks which file each entry comes from
+- `analyze_cohort.py` — cohort analysis for a named agent/skill group (`--target bmad`, `--target bmad:dev`, `--target slash:/x`, `--target skill:x`, `--target tag:x`) or discovery mode (`--list`) that scans logs and ranks candidate groups by invocation count. Reports direct invocations, per-member breakdown, session-level adoption (sessions containing ≥1 invocation + prompts inside those sessions — the realistic "how much work happens in this mode" figure), session-length comparison vs non-cohort, member combinations, daily volume, friction (denials + negation language) within cohort sessions, and agent-tool subagent fanout. Auto-detects declared sets for unused-member reporting (BMAD family → `.bmad-core/agents/*.md`, skill family → `.claude/skills/*/SKILL.md`); `--declared-from` overrides. Discovery dedupes across detection paths: BMAD tag family absorbs `/BMad:agents:*` slashes; `<command-message>` entries covered by a slash-cluster are suppressed.
 
 All analysis scripts support `--logs-dir` (repeatable), `--since`, auto-discover log directories, and `--project-filter DIR` to restrict analysis to entries from a specific project. Path comparison in `--project-filter` normalizes backslashes to forward slashes for Windows compatibility.
 
@@ -67,6 +68,7 @@ skills/claudicate/
     diagnose.md
     gait.md
     agent-xray.md
+    cohort.md
     prescribe.md
     prescribe-bmad.md
     rehab.md
@@ -77,11 +79,13 @@ skills/claudicate/
     extract_permissions.py
     analyze_usage.py
     analyze_agents.py
+    analyze_cohort.py
 ```
 
 Two workflow chains:
 - **User friction**: `diagnose` (generates friction report) → `prescribe` or `prescribe-bmad` (consumes friction report, cross-references with current config, suggests changes)
 - **Agent improvement**: `agent-xray` (agent session analysis) + friction report → `rehab` (suggests agent prompt, skill, and instruction improvements)
+- **Skillset analysis**: `cohort` (targeted or auto-discovered group breakdown — session-level adoption, member distribution, declared-vs-observed) — feeds qualitative input into `prescribe-bmad` and `rehab`
 - **Log management**: `clean` (delete logs and/or friction reports by scope, optionally filtered by date)
 - **Permission optimization**: `tighten` (analyzes both `settings.json` and `settings.local.json` for redundancies, consolidation, new candidates from tool usage/denial logs, and overly broad patterns with tightening suggestions based on actual usage; scope-aware with cross-scope redundancy detection; in project scope, also reads global settings; writes changes back to the correct file)
 
